@@ -235,8 +235,12 @@ if (typeof window !== 'undefined') {
   // FUNCIÓN DE CIERRE CÍCLICO AUTOMÁTICO S-13
   async function verificarYCcerrarFraccion(fraccionNombre, conductorNombre) {
     try {
-      const { data: manzanas, error: errFetch } = await window.SupabaseService.fetchManzanas();
-      if (errFetch) throw errFetch;
+      const client = getSupabase();
+      if (!client) return false;
+
+      // Obtener manzanas de la fraccion directamente desde Supabase
+      const manzanas = await fetchManzanas();
+      if (!Array.isArray(manzanas) || manzanas.length === 0) return false;
 
       const manzanasFraccion = manzanas.filter(m => {
         const props = m.coordenadas?.properties || m.coordenadas;
@@ -246,29 +250,27 @@ if (typeof window !== 'undefined') {
       if (manzanasFraccion.length === 0) return false;
 
       const totales = manzanasFraccion.length;
-      const completadas = manzanasFraccion.filter(m => m.status === 'Completed').length;
+      const completadas = manzanasFraccion.filter(
+        m => m.status === 'Completed' || m.estado === 'completada'
+      ).length;
 
       if (completadas < totales) return false;
 
-      const fechaInicio = new Date().toISOString().split('T')[0];
-      const fechaCompleto = new Date().toISOString().split('T')[0];
+      const fechaStr = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' });
       const anoActual = new Date().getFullYear();
 
-      const { error: errHistorial } = await window.supabase
+      const { error: errHistorial } = await client
         .from('historial_s13')
         .insert([{
-          num_territorio: fraccionNombre,
-          conductor_asignado: conductorNombre || 'Grupo de Trabajo',
-          fecha_asigno: fechaInicio,
-          fecha_completo: fechaCompleto,
-          ano_servicio: anoActual
+          numero_terr: fraccionNombre,
+          asignado_1: conductorNombre || 'Grupo de Trabajo',
+          fecha_asigno_1: fechaStr,
+          fecha_completo_1: fechaStr,
+          ultima_fecha_completo: fechaStr,
+          ano_servicio: String(anoActual)
         }]);
 
       if (errHistorial) throw errHistorial;
-
-      for (const m of manzanasFraccion) {
-        await window.SupabaseService.updateManzana(m.id, 'Pending');
-      }
 
       return true;
     } catch (error) {

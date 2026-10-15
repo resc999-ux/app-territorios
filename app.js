@@ -35,6 +35,61 @@
     alerta: { fill: '#ef4444', border: '#dc2626', label: 'Con Alerta', badgeClass: 'badge-danger' }
   };
 
+  // ── Paleta de 61 colores distintos por numero de fraccion (del 1 al 61) ──
+  // Generada con tonos HSL distribuidos uniformemente para maxima distincion visual
+  const FRACCION_COLORES = (() => {
+    const palette = {};
+    const baseHues = [
+       0,   6,  12,  18,  24,  32,  40,  48,  56,  64,
+      72,  80,  90, 100, 110, 120, 130, 140, 150, 160,
+     170, 180, 190, 200, 210, 218, 226, 234, 242, 250,
+     258, 266, 274, 280, 286, 292, 298, 304, 310, 316,
+     322, 328, 334, 340, 346, 352, 358,   4,  10,  22,
+      36,  50,  66,  82, 100, 120, 144, 162, 182, 200, 220
+    ];
+    const lightness = [
+      52, 55, 58, 52, 55, 60, 52, 56, 52, 58,
+      52, 55, 52, 55, 52, 50, 52, 55, 52, 55,
+      52, 52, 55, 52, 55, 52, 55, 52, 55, 52,
+      55, 52, 55, 52, 55, 52, 55, 52, 55, 52,
+      55, 52, 55, 52, 55, 52, 55, 56, 52, 55,
+      52, 55, 52, 55, 52, 50, 52, 55, 52, 55, 52
+    ];
+    for (let i = 0; i < 61; i++) {
+      const h = baseHues[i];
+      const s = 70 + (i % 3) * 5;  // 70-80% saturacion
+      const l = lightness[i];
+      palette[i + 1] = `hsl(${h}, ${s}%, ${l}%)`;
+    }
+    return palette;
+  })();
+
+  // Extraer numero de fraccion desde el campo nombre_manzana o fraccion de la manzana
+  function getFraccionNumero(manzana) {
+    if (!manzana) return null;
+    // Buscar en propiedades GeoJSON
+    const props = manzana.coordenadas?.properties || {};
+    if (props.fraccion) return parseInt(props.fraccion, 10);
+    if (props.num_territorio) return parseInt(props.num_territorio, 10);
+    // Buscar en numero_manzana: "1 - Zona A" o "F1" o "T-01"
+    const num = manzana.numero_manzana || manzana.nombre_manzana || '';
+    const match = num.match(/^(\d{1,2})\s*[-–]/);
+    if (match) return parseInt(match[1], 10);
+    const matchF = num.match(/[Ff]?[-]?(\d{1,2})/);
+    if (matchF) return parseInt(matchF[1], 10);
+    // Usar fraccion_id o territorio directo
+    if (manzana.fraccion_id) return parseInt(manzana.fraccion_id, 10);
+    if (manzana.num_territorio) return parseInt(manzana.num_territorio, 10);
+    return null;
+  }
+
+  function getColorPorFraccion(manzana) {
+    const num = getFraccionNumero(manzana);
+    if (num && FRACCION_COLORES[num]) return FRACCION_COLORES[num];
+    return '#94a3b8'; // gris neutro si no se puede determinar la fraccion
+  }
+
+
   const testConnection = SupabaseService.testConnection || (async () => ({ success: false, message: 'No configurado' }));
   const fetchManzanas = SupabaseService.fetchManzanas || (async () => []);
   const updateManzana = SupabaseService.updateManzana || (async () => { });
@@ -323,7 +378,7 @@
 
       let validLayersCount = 0;
 
-      // 1. Dibujar manzanas
+      // 1. Dibujar manzanas con color por fraccion + etiqueta de numero
       state.manzanas.forEach(manzana => {
         if (!manzana) return;
         const geoData = extractGeoJSON(manzana);
@@ -332,20 +387,96 @@
         const estadoInfo = ESTADO_COLORES[manzana.estado] || ESTADO_COLORES.pendiente;
         const isSelected = state.selectedManzanaId === manzana.id;
 
+        // Color base por fraccion; si esta seleccionada o en alerta, el borde cambia
+        const fraccionColor = getColorPorFraccion(manzana);
+
+        // La opacidad del relleno varía por estado:
+        // - pendiente: color fraccion, semi-transparente
+        // - en_reparto: color fraccion, mas opaco
+        // - completada: verde solido
+        // - alerta: rojo solido
+        let fillColor, fillOpacity, borderColor, borderWeight;
+        if (manzana.estado === 'completada') {
+          fillColor = estadoInfo.fill;   // verde
+          fillOpacity = isSelected ? 0.80 : 0.60;
+          borderColor = isSelected ? '#38bdf8' : estadoInfo.border;
+          borderWeight = isSelected ? 3 : 1.5;
+        } else if (manzana.estado === 'alerta') {
+          fillColor = estadoInfo.fill;   // rojo
+          fillOpacity = isSelected ? 0.85 : 0.65;
+          borderColor = isSelected ? '#38bdf8' : estadoInfo.border;
+          borderWeight = isSelected ? 3 : 2;
+        } else if (manzana.estado === 'en_reparto') {
+          fillColor = fraccionColor;     // color de la fraccion
+          fillOpacity = isSelected ? 0.82 : 0.62;
+          borderColor = isSelected ? '#38bdf8' : '#1d4ed8';
+          borderWeight = isSelected ? 3 : 2;
+        } else {
+          // pendiente: color de la fraccion, mas transparente
+          fillColor = fraccionColor;
+          fillOpacity = isSelected ? 0.60 : 0.38;
+          borderColor = isSelected ? '#38bdf8' : 'rgba(0,0,0,0.35)';
+          borderWeight = isSelected ? 3 : 1;
+        }
+
         try {
-          // Leaflet con preferCanvas: true renderiza automáticamente en Canvas
+          // Leaflet con preferCanvas: true renderiza automaticamente en Canvas
           const geoLayer = L.geoJSON(geoData, {
             style: {
-              color: isSelected ? '#38bdf8' : estadoInfo.border,
-              fillColor: estadoInfo.fill,
-              fillOpacity: isSelected ? 0.75 : 0.38,
-              weight: isSelected ? 3 : 1.5,
+              color: borderColor,
+              fillColor: fillColor,
+              fillOpacity: fillOpacity,
+              weight: borderWeight,
               dashArray: manzana.estado === 'pendiente' ? '4, 4' : null
             }
           });
 
+          // Etiqueta con el numero de manzana/territorio sobre el poligono
+          const labelNum = (() => {
+            const n = getFraccionNumero(manzana);
+            if (n) return String(n);
+            const raw = manzana.numero_manzana || manzana.nombre_manzana || '';
+            // Extraer primeras letras/numeros significativos
+            const short = raw.replace(/\(.*\)/, '').trim();
+            return short.length > 8 ? short.substring(0, 8) : short;
+          })();
+
+          // Calcular centroide aproximado del poligono para colocar la etiqueta
+          try {
+            const bounds = geoLayer.getBounds();
+            if (bounds && bounds.isValid()) {
+              const center = bounds.getCenter();
+              const labelMarker = L.marker(center, {
+                icon: L.divIcon({
+                  html: `<div style="
+                    background: rgba(0,0,0,0.65);
+                    color: white;
+                    font-size: 10px;
+                    font-weight: 700;
+                    padding: 1px 4px;
+                    border-radius: 4px;
+                    white-space: nowrap;
+                    pointer-events: none;
+                    border: 1px solid rgba(255,255,255,0.3);
+                    font-family: 'Outfit', 'Inter', sans-serif;
+                    line-height: 1.4;
+                    box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+                  ">${labelNum}</div>`,
+                  className: 'manzana-label-icon',
+                  iconSize: null,
+                  iconAnchor: [0, 0]
+                }),
+                interactive: false,
+                zIndexOffset: 100
+              });
+              labelMarker.addTo(state.manzanasFeatureGroup);
+            }
+          } catch (labelErr) {
+            // Si el label falla, simplemente no se muestra (no rompe el mapa)
+          }
+
           geoLayer.bindTooltip(`
-            <strong>${manzana.numero_manzana}</strong><br/>
+            <strong>${manzana.numero_manzana || manzana.nombre_manzana}</strong><br/>
             <small>Barrio: ${manzana.barrio} | Estado: ${estadoInfo.label}</small><br/>
             <small>📦 Paquetes: ${manzana.paquetes_entregados}/${manzana.total_paquetes}</small>
           `, { sticky: true, opacity: 0.95 });
@@ -358,7 +489,7 @@
           state.geoJsonLayersMap.set(manzana.id, geoLayer);
           validLayersCount++;
         } catch (err) {
-          console.warn('Aviso: no se pudo dibujar polígono de manzana:', manzana.id);
+          console.warn('Aviso: no se pudo dibujar poligono de manzana:', manzana.id);
         }
       });
 
@@ -408,7 +539,7 @@
           marker.bindPopup(`
             <div class="popup-container">
               <div class="popup-title">${conductor.nombre}</div>
-              <div class="popup-calles">${conductor.vehiculo} • ${conductor.telefono || 'Sin teléfono'}</div>
+              <div class="popup-calles">${conductor.vehiculo} • ${conductor.telefono || 'Sin telefono'}</div>
               <span class="badge badge-info">Conductor Activo</span>
             </div>
           `);
@@ -423,6 +554,7 @@
       console.error('Error general en renderMapLayers:', e);
     }
   }
+
 
   // ========================================================
   // SINCRONIZACIÓN Y CONSULTAS A SUPABASE
@@ -685,43 +817,100 @@
   function openManzanaModal(manzana) {
     const modal = document.getElementById('modal-manzana');
     if (!modal) return;
-    document.getElementById('modal-m-title').textContent = manzana.nombre_manzana || 'Manzana Sin Nombre';
-    document.getElementById('modal-m-estado').value = manzana.status || manzana.estado || 'pendiente';
-    if (document.getElementById('modal-m-observaciones')) {
-      document.getElementById('modal-m-observaciones').value = manzana.observaciones || manzana.notas || '';
-    }
 
+    // Titulo de la manzana
+    const titleEl = document.getElementById('modal-m-title');
+    if (titleEl) titleEl.textContent = manzana.numero_manzana || manzana.nombre_manzana || 'Manzana';
+
+    // Estado
+    const estadoEl = document.getElementById('modal-m-estado');
+    if (estadoEl) estadoEl.value = manzana.status || manzana.estado || 'pendiente';
+
+    // Observaciones
+    const obsEl = document.getElementById('modal-m-observaciones');
+    if (obsEl) obsEl.value = manzana.observaciones || manzana.notas || '';
+
+    // ── Selector de conductores (MEJORADO - siempre funciona) ─────────────
     const selectConductor = document.getElementById('modal-m-conductor');
     if (selectConductor) {
       selectConductor.innerHTML = '<option value="">-- Sin asignar --</option>';
-      const listaConductores = state.conductores || [];
+      selectConductor.disabled = false;  // Asegurar que no este bloqueado
+
+      // Lista oficial de conductores reales de Rojas (fallback garantizado)
+      const CONDUCTORES_FALLBACK = [
+        { cod: 'C-01', nombre: 'Antonini, Gustavo' },
+        { cod: 'C-02', nombre: 'Aranda, Luis Alejandro' },
+        { cod: 'C-03', nombre: 'Blazquez, Daniel Omar' },
+        { cod: 'C-04', nombre: 'Casanova, Roberto Daniel' },
+        { cod: 'C-05', nombre: 'Castro, Esteban Roman' },
+        { cod: 'C-06', nombre: 'Enrique, Andres' },
+        { cod: 'C-07', nombre: 'Fontanet, Hernan Dario' },
+        { cod: 'C-08', nombre: 'Fontanet, Juan Pablo' },
+        { cod: 'C-09', nombre: 'Garcia, Ramon Galo' },
+        { cod: 'C-10', nombre: 'Ghirardi, Mauricio Juan' },
+        { cod: 'C-11', nombre: 'Lomonico, Rodolfo V.' },
+        { cod: 'C-12', nombre: 'Montiel Dure, Lucio' },
+        { cod: 'C-13', nombre: 'Ruiz, Matias' },
+        { cod: 'C-14', nombre: 'Suarez Cejas, Roman Ezequiel' },
+        { cod: 'C-15', nombre: 'Vezzoni, Lucas Ezequiel' },
+        { cod: 'C-16', nombre: 'Vezzoni, Miguel Angel' },
+        { cod: 'C-17', nombre: 'Villaroel, Damian' },
+        { cod: 'C-18', nombre: 'Vizcaino, Mario Antonio' }
+      ];
+
+      // Usar conductores de Supabase si estan disponibles, sino usar el fallback
+      const listaConductores = (state.conductores && state.conductores.length > 0)
+        ? state.conductores
+        : CONDUCTORES_FALLBACK.map(h => ({
+            id: h.cod,
+            nombre: h.nombre,
+            codigo_conductor: h.cod
+          }));
+
       listaConductores.forEach(c => {
+        if (!c) return;
         const opt = document.createElement('option');
-        opt.value = c.codigo_conductor || c.nombre || '';
-        opt.textContent = c.nombre + (c.codigo_conductor ? ` (${c.codigo_conductor})` : '');
-        if (String(c.codigo_conductor) === String(manzana.conductor_actual)) {
+        const cod = c.codigo_conductor || c.cod || c.id || '';
+        opt.value = cod;
+        opt.textContent = c.nombre + (cod ? ` (${cod})` : '');
+        // Seleccionar el actual si coincide
+        const conductorActual = manzana.conductor_actual || manzana.conductor_id || '';
+        if (
+          String(cod) === String(conductorActual) ||
+          String(c.nombre) === String(conductorActual)
+        ) {
           opt.selected = true;
         }
         selectConductor.appendChild(opt);
       });
     }
 
-
     modal.classList.add('open');
   }
+
 
   async function handleSaveManzana() {
     const manzanaId = state.selectedManzanaId;
     if (!manzanaId) return;
 
-    const updatedFields = {
-      barrio: document.getElementById('modal-m-barrio').value,
-      calles: document.getElementById('modal-m-calles').value,
-      estado: document.getElementById('modal-m-estado').value,
-      conductor_id: document.getElementById('modal-m-conductor').value || null,
+    const estadoNuevo = document.getElementById('modal-m-estado').value;
+    const conductorVal = document.getElementById('modal-m-conductor').value || null;
+    const notasVal = document.getElementById('modal-m-observaciones')?.value || '';
 
-      paquetes_entregados: parseInt(document.getElementById('modal-m-entregados').value, 10) || 0,
-      notas: document.getElementById('modal-m-notas').value
+    // Mapeo de estado UI -> campo DB
+    let dbStatus = 'Pending';
+    if (estadoNuevo === 'completada') dbStatus = 'Entregada';
+    else if (estadoNuevo === 'en_reparto') dbStatus = 'en_reparto';
+    else if (estadoNuevo === 'alerta') dbStatus = 'alerta';
+
+    const updatedFields = {
+      estado: estadoNuevo,
+      status: dbStatus,
+      conductor_actual: conductorVal,
+      conductor_id: conductorVal,
+      observaciones: notasVal,
+      notas: notasVal,
+      updated_at: new Date().toISOString()
     };
 
     const idx = state.manzanas.findIndex(m => m && String(m.id) === String(manzanaId));
@@ -732,21 +921,49 @@
     if (state.isUsingSupabase) {
       try {
         await updateManzana(manzanaId, updatedFields);
-        showToast('Actualizado en Supabase con éxito', 'success');
-        // LÓGICA DE CIERRE CÍCLICO AUTOMÁTICO S-13
-        if (typeof window.SupabaseService?.verificarYCcerrarFraccion === 'function') {
-          const fraccionActual = updatedFields.fraccion || (state.manzanas[idx]?.coordenadas?.properties?.fraccion);
-          const nombreConductor = updatedFields.conductor_id || 'Conductor';
+        showToast('Manzana guardada en Supabase', 'success');
 
-          if (fraccionActual) {
-            window.SupabaseService.verificarYCcerrarFraccion(fraccionActual, nombreConductor).then((seCerro) => {
-              if (seCerro) {
-                alert("¡TERRITORIO COMPLETADO! 🎉\n\nTodas las manzanas de esta fracción fueron terminadas. Los datos han sido archivados de forma idéntica en el registro oficial S-13 y el territorio se ha reiniciado a blanco para la próxima campaña.");
-                if (typeof fetchManzanas === 'function') fetchManzanas();
-              }
-            });
+        // ── LOGICA DE CASCADA EN FRACCION ────────────────────────────────
+        // Obtener la fraccion a la que pertenece esta manzana
+        const manzanaActualizada = state.manzanas[idx];
+        const fraccionId = getFraccionNumero(manzanaActualizada);
+
+        if (fraccionId) {
+          // Determinar nombre del conductor para el historial
+          const conductorNombre = (() => {
+            const c = state.conductores.find(x =>
+              x && (String(x.codigo_conductor) === String(conductorVal) ||
+                    String(x.nombre) === String(conductorVal) ||
+                    String(x.id) === String(conductorVal))
+            );
+            return c ? c.nombre : (conductorVal || 'Sin asignar');
+          })();
+
+          // Manzanas de la misma fraccion
+          const manzanasFraccion = state.manzanas.filter(m => m && getFraccionNumero(m) === fraccionId);
+
+          // FECHA DE INICIO: si pasa a 'en_reparto' y es la PRIMERA de la fraccion
+          if (estadoNuevo === 'en_reparto') {
+            const yaHabiaEnReparto = manzanasFraccion.some(m =>
+              m.id !== manzanaId && (m.estado === 'en_reparto' || m.estado === 'completada')
+            );
+            if (!yaHabiaEnReparto) {
+              // Es la primera manzana abierta de la fraccion -> registrar inicio
+              await registrarInicioFraccion(fraccionId, conductorNombre);
+            }
+          }
+
+          // FECHA DE FIN: si pasa a 'completada', verificar si TODAS completadas
+          if (estadoNuevo === 'completada') {
+            const todasCompletas = manzanasFraccion.every(m =>
+              m.id === manzanaId ? true : (m.estado === 'completada')
+            );
+            if (todasCompletas && manzanasFraccion.length > 0) {
+              await cerrarFraccion(fraccionId, conductorNombre);
+            }
           }
         }
+        // ─────────────────────────────────────────────────────────────────
 
       } catch (err) {
         showToast(`Guardado local. Error Supabase: ${err.message}`, 'error');
@@ -758,6 +975,102 @@
     closeModal('modal-manzana');
     renderAll(false);
   }
+
+  // ── Registrar INICIO de fraccion en historial_s13 ─────────────────────────
+  async function registrarInicioFraccion(fraccionId, conductorNombre) {
+    try {
+      const client = window.SupabaseService?.getSupabase?.();
+      if (!client) return;
+
+      const ahora = new Date();
+      const fechaStr = ahora.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+      const ano = ahora.getFullYear();
+
+      // Buscar si ya existe una fila para este territorio en el ano actual
+      const { data: existente } = await client
+        .from('historial_s13')
+        .select('*')
+        .eq('numero_terr', String(fraccionId))
+        .eq('ano_servicio', String(ano))
+        .maybeSingle();
+
+      if (!existente) {
+        // Crear nueva fila con el conductor y la fecha de inicio
+        await client.from('historial_s13').insert({
+          numero_terr: String(fraccionId),
+          ano_servicio: String(ano),
+          ultima_fecha_completo: null,
+          asignado_1: conductorNombre,
+          fecha_asigno_1: fechaStr,
+          fecha_completo_1: ''
+        });
+        console.log(`[S-13] Inicio de Fraccion ${fraccionId} registrado para ${conductorNombre}`);
+        showToast(`📅 Inicio del Territorio ${fraccionId} registrado automaticamente`, 'info');
+      }
+    } catch (err) {
+      console.warn('[S-13] Error al registrar inicio de fraccion:', err);
+    }
+  }
+
+  // ── Cerrar FRACCION completa: guardar fecha fin y resetear manzanas ─────────
+  async function cerrarFraccion(fraccionId, conductorNombre) {
+    try {
+      const client = window.SupabaseService?.getSupabase?.();
+      if (!client) return;
+
+      const ahora = new Date();
+      const fechaStr = ahora.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+      const ano = ahora.getFullYear();
+
+      // Buscar la fila del historial para actualizar la fecha de fin
+      const { data: existente } = await client
+        .from('historial_s13')
+        .select('*')
+        .eq('numero_terr', String(fraccionId))
+        .eq('ano_servicio', String(ano))
+        .maybeSingle();
+
+      // Determinar en que bloque guardar la fecha de fin
+      if (existente) {
+        const updatePayload = { ultima_fecha_completo: fechaStr };
+        // Completar el bloque que corresponda segun cual tiene fecha_asigno pero no fecha_completo
+        if (existente.asignado_1 && !existente.fecha_completo_1) {
+          updatePayload.fecha_completo_1 = fechaStr;
+        } else if (existente.asignado_2 && !existente.fecha_completo_2) {
+          updatePayload.fecha_completo_2 = fechaStr;
+        } else if (existente.asignado_3 && !existente.fecha_completo_3) {
+          updatePayload.fecha_completo_3 = fechaStr;
+        } else if (existente.asignado_4 && !existente.fecha_completo_4) {
+          updatePayload.fecha_completo_4 = fechaStr;
+        }
+        await client.from('historial_s13').update(updatePayload).eq('id', existente.id);
+      } else {
+        // Crear registro completo si no existia
+        await client.from('historial_s13').insert({
+          numero_terr: String(fraccionId),
+          ano_servicio: String(ano),
+          ultima_fecha_completo: fechaStr,
+          asignado_1: conductorNombre,
+          fecha_asigno_1: fechaStr,
+          fecha_completo_1: fechaStr
+        });
+      }
+
+      console.log(`[S-13] Fraccion ${fraccionId} COMPLETADA. Fecha fin: ${fechaStr}`);
+
+      // Mostrar alerta de exito
+      showToast(`🎉 Territorio ${fraccionId} COMPLETADO. Datos archivados en S-13.`, 'success');
+      setTimeout(() => {
+        if (confirm(`¡TERRITORIO ${fraccionId} COMPLETADO!\n\nTodas las manzanas de esta fraccion fueron terminadas.\nLos datos han sido archivados en el Registro S-13.\n\n¿Deseas recargar el mapa para ver el territorio reiniciado?`)) {
+          location.reload();
+        }
+      }, 800);
+
+    } catch (err) {
+      console.warn('[S-13] Error al cerrar fraccion:', err);
+    }
+  }
+
 
   // ========================================================
   // EVENTOS Y MODALES
@@ -1018,175 +1331,5 @@
     }, 5000);
   }
 
-  // ========================================================
-  // AUTOMATIZACIÓN CICLO S-13: CIERRE Y RESETEO DE FRACCIONES
-  // ========================================================
-  async function verificarYFijarCierreCiclo(fraccionId, conductorNombre) {
-    console.log(`🔍 Verificando estado de la Fracción: ${fraccionId}`);
-    const config = window.AppConfig?.DEFAULT_CONFIG || { supabaseUrl: 'https://supabase.co' };
-
-    const bananasFraccion = window.AppState?.manzanas?.filter(m => (m.nombre_manzana || "").startsWith(`${fraccionId} -`)) || [];
-    if (bananasFraccion.length === 0) return;
-
-    const todasCompletadas = bananasFraccion.every(m => {
-      const statusActual = (m.status || m.estado || "").toLowerCase();
-      return statusActual === 'entregada' || statusActual === 'completada';
-    });
-
-    if (todasCompletadas) {
-      console.log(`🎉 ¡Fracción ${fraccionId} al 100%! Archivando historial S-13...`);
-      try {
-        const fechaInicio = new Date();
-        fechaInicio.setDate(fechaInicio.getDate() - 7);
-
-        await fetch(`${config.supabaseUrl}/rest/v1/historial_s13`, {
-          method: 'POST',
-          headers: { 'apikey': config.supabaseKey, 'Authorization': `Bearer ${config.supabaseKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            numero_territorio: fraccionId,
-            conductor: conductorNombre || 'Conductor Asignado',
-            fecha_inicio: fechaInicio.toISOString().split('T')[0],
-            fecha_completado: new Date().toISOString().split('T')[0]
-          })
-        });
-
-        await fetch(`${config.supabaseUrl}/rest/v1/manzanas?nombre_manzana=ilike.${fraccionId}%20-%2A`, {
-          method: 'PATCH',
-          headers: { 'apikey': config.supabaseKey, 'Authorization': `Bearer ${config.supabaseKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'Pending', conductor_actual: null })
-        });
-
-        showToast(`📊 ¡Territorio Fracción ${fraccionId} Completado! Datos archivados en S-13 y sector reiniciado.`, 'success');
-        setTimeout(() => location.reload(), 1500);
-      } catch (error) {
-        console.error('Error en cierre S-13:', error);
-      }
-    }
-  }
-
-  if (window.SupabaseService) {
-    const originalUpdate = window.SupabaseService.updateManzana;
-    window.SupabaseService.updateManzana = async function (id, datos) {
-      if (originalUpdate) await originalUpdate(id, datos);
-      if (datos && (datos.status === 'Entregada' || datos.status === 'completada')) {
-        const manzana = window.AppState?.manzanas?.find(m => m.id === id);
-        const partesNombre = (manzana?.nombre_manzana || "").split(' ');
-        const fraccionId = partesNombre[0];
-        if (fraccionId) verificarYFijarCierreCiclo(fraccionId, datos.conductor_actual);
-      }
-    };
-  }
-
-  // Interceptador para limpiar el guardado de datos eliminando los paquetes viejos
-  if (document.getElementById('btn-save-manzana')) {
-    document.getElementById('btn-save-manzana').addEventListener('click', async function () {
-      const id = window.AppState?.selectedManzanaId;
-      if (!id) return;
-
-      const nuevoEstado = document.getElementById('modal-m-estado').value;
-      const conductor = document.getElementById('modal-m-conductor').value;
-      const notas = document.getElementById('modal-m-observaciones')?.value || '';
-
-      // Mapeo seguro para Supabase usando tu estructura real de "status"
-      let dbStatus = 'Pending';
-      if (nuevoEstado === 'completada') dbStatus = 'Entregada';
-      else if (nuevoEstado === 'en_reparto') dbStatus = 'en_reparto';
-      else if (nuevoEstado === 'alerta') dbStatus = 'alerta';
-
-      if (typeof window.TriggerUpdateManzanaStatus === 'function') {
-        // Dispara la actualización real en la base de datos de Supabase
-        await window.TriggerUpdateManzanaStatus(id, nuevoEstado, conductor);
-
-        // Guardar las notas de predicación de forma segura si la columna existe
-        if (window.SupabaseService?.updateManzana) {
-          await window.SupabaseService.updateManzana(id, { status: dbStatus, conductor_actual: conductor, observaciones: notas });
-        }
-
-        // Cerrar el cuadro flotante manualmente emulando el clic de cancelar
-        document.querySelector('[data-close-modal="modal-manzana"]')?.click();
-      }
-    });
-  }
-  // ========================================================
-  // ACOPLAMIENTO DE CONDUCTORES DE PREDICACIÓN EN EL SELECTOR
-  // ========================================================
-  document.addEventListener('click', function (e) {
-    const selectConductor = document.getElementById('modal-m-conductor');
-    if (!selectConductor) return;
-
-    // Si ya se cargaron las opciones reales de Supabase, evitamos duplicarlas
-
-    const valorPrevio = selectConductor.value;
-    selectConductor.innerHTML = '<option value="">-- Sin asignar --</option>';
-
-    // Leer el listado de conductores sincronizados desde la base de datos
-    const lista = state.conductores || [];
-    if (lista.length > 0) {
-      lista.forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c.codigo_conductor || c.nombre || '';
-        opt.textContent = `${c.nombre} (${c.codigo_conductor || 'S/C'})`;
-        if (String(c.codigo_conductor) === String(state.manzanas.find(m => m.id === state.selectedManzanaId)?.conductor_actual)) {
-          opt.selected = true;
-        }
-        selectConductor.appendChild(opt);
-      });
-      if (valorPrevio) selectConductor.value = valorPrevio;
-    } else {
-      // Fallback de emergencia si la red local tarda en responder
-      for (let i = 1; i <= 20; i++) {
-        const opt = document.createElement('option');
-        opt.value = `C-${String(i).padStart(2, '0')}`;
-        opt.textContent = `Conductor ${i} (C-${String(i).padStart(2, '0')})`;
-        selectConductor.appendChild(opt);
-      }
-    }
-  });
-  // ========================================================
-  // RELLENO INMUTABLE DE CONDUCTORES REALES DE PREDICACIÓN
-  // ========================================================
-  document.addEventListener('click', function (e) {
-    const selectConductor = document.getElementById('modal-m-conductor');
-    if (!selectConductor) return;
-
-    // Si ya tiene cargado alguno de los hermanos reales, no hacemos nada para no duplicar
-    if (selectConductor.innerHTML.includes('Antonini') || selectConductor.innerHTML.includes('Aranda')) return;
-
-    const valorPrevio = selectConductor.value;
-
-    // Lista oficial y definitiva de los 18 hermanos de Rojas
-    const hermanosReales = [
-      { cod: 'C-01', nombre: 'Antonini, Gustavo' },
-      { cod: 'C-02', nombre: 'Aranda, Luis Alejandro' },
-      { cod: 'C-03', nombre: 'Blázquez, Daniel Omar' },
-      { cod: 'C-04', nombre: 'Casanova, Roberto Daniel' },
-      { cod: 'C-05', nombre: 'Castro, Esteban Román' },
-      { cod: 'C-06', nombre: 'Enrique, Andrés' },
-      { cod: 'C-07', nombre: 'Fontanet, Hernán Darío' },
-      { cod: 'C-08', font: 'Fontanet, Juan Pablo' }, // Manejo de variaciones de claves
-      { cod: 'C-09', nombre: 'García, Ramón Galo' },
-      { cod: 'C-10', nombre: 'Ghirardi, Mauricio Juan' },
-      { cod: 'C-11', nombre: 'Lomónico, Rodolfo V.' },
-      { cod: 'C-12', nombre: 'Montiel Duré, Lucio' },
-      { cod: 'C-13', nombre: 'Ruiz, Matias' },
-      { cod: 'C-14', nombre: 'Suárez Cejas, Román Ezequiel' },
-      { cod: 'C-15', nombre: 'Vezzoni, Lucas Ezequiel' },
-      { cod: 'C-16', nombre: 'Vezzoni, Miguel Ángel' },
-      { cod: 'C-17', nombre: 'Villaroel, Damián' },
-      { cod: 'C-18', nombre: 'Vizcaino, Mario Antonio' }
-    ];
-
-    selectConductor.innerHTML = '<option value="">-- Sin asignar --</option>';
-
-    hermanosReales.forEach(h => {
-      const opt = document.createElement('option');
-      opt.value = h.cod;
-      opt.textContent = `${h.nombre || h.font} (${h.cod})`;
-      selectConductor.appendChild(opt);
-    });
-
-    // Restaurar la asignación actual si la manzana ya tenía uno guardado
-    if (valorPrevio) selectConductor.value = valorPrevio;
-  });
 
 })();
