@@ -1,0 +1,8 @@
+/**
+ * Puente de variables de entorno para navegador (.env -> window.__ENV__)
+ * Este archivo permite al frontend leer las credenciales sin requerir un bundler de Node.js.
+ */
+window.__ENV__ = {
+  SUPABASE_URL: "https://fhczcoiolmrsrrlpxnee.supabase.co",
+  SUPABASE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZoY3pjb2lvbG1yc3JybHB4bmVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NTE3ODYsImV4cCI6MjEwNzIyNzc4Nn0.vQS-H4mnDYdgj1_S5rf6aXvVAcU_rlw433PTlJuxevE"
+};

@@ -1,0 +1,1054 @@
+/* ========================================================
+   SISTEMA DE DISEÑO - CONTROL TERRITORIAL ROJAS
+   Estilo Premium: Dark Glassmorphic, Modern Typography
+   ======================================================== */
+
+:root {
+  --bg-main: #0b0f19;
+  --bg-surface: #111827;
+  --bg-surface-elevated: #1e293b;
+  --bg-glass: rgba(17, 24, 39, 0.75);
+  --bg-glass-card: rgba(30, 41, 59, 0.65);
+  
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-highlight: rgba(56, 189, 248, 0.35);
+
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+
+  --accent-cyan: #0ea5e9;
+  --accent-blue: #3b82f6;
+  --accent-emerald: #10b981;
+  --accent-amber: #f59e0b;
+  --accent-rose: #f43f5e;
+  --accent-purple: #8b5cf6;
+
+  --font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
+
+  --shadow-subtle: 0 4px 20px rgba(0, 0, 0, 0.35);
+  --shadow-glow: 0 0 25px rgba(14, 165, 233, 0.25);
+  --shadow-modal: 0 20px 40px rgba(0, 0, 0, 0.6);
+
+  --sidebar-width: 420px;
+  --header-height: 70px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ========================================================
+   ESTRUCTURA PRINCIPAL
+   ======================================================== */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  position: relative;
+}
+
+/* ========================================================
+   HEADER / BARRA SUPERIOR
+   ======================================================== */
+.app-header {
+  height: var(--header-height);
+  background: var(--bg-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  z-index: 1000;
+}
+
+.brand-section {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.brand-logo-icon {
+  width: 42px;
+  height: 42px;
+  background: linear-gradient(135deg, #0284c7, #2563eb);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
+}
+
+.brand-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: linear-gradient(to right, #ffffff, #94a3b8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.brand-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.brand-city-badge {
+  background: rgba(14, 165, 233, 0.15);
+  color: #38bdf8;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+/* Stats en Header */
+.header-stats {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.stat-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  font-size: 0.8rem;
+}
+
+.stat-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.stat-dot.total { background: #94a3b8; }
+.stat-dot.pendiente { background: var(--accent-amber); }
+.stat-dot.reparto { background: var(--accent-blue); }
+.stat-dot.entregado { background: var(--accent-emerald); }
+
+.stat-val {
+  font-weight: 700;
+  color: #ffffff;
+}
+
+/* Acciones en Header */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Badge de estado Supabase */
+.supabase-status-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.supabase-status-pill:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--border-highlight);
+}
+
+.status-indicator {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  position: relative;
+}
+
+.status-indicator.connected {
+  background-color: var(--accent-emerald);
+  box-shadow: 0 0 10px var(--accent-emerald);
+}
+
+.status-indicator.fallback {
+  background-color: var(--accent-amber);
+  box-shadow: 0 0 10px var(--accent-amber);
+}
+
+.status-indicator.error {
+  background-color: var(--accent-rose);
+  box-shadow: 0 0 10px var(--accent-rose);
+}
+
+.btn-icon {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-icon:hover {
+  background: var(--bg-surface-elevated);
+  border-color: var(--border-highlight);
+  color: #38bdf8;
+  transform: translateY(-1px);
+}
+
+/* ========================================================
+   CUERPO PRINCIPAL (SIDEBAR + MAPA)
+   ======================================================== */
+.app-body {
+  display: flex;
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Sidebar */
+.app-sidebar {
+  width: var(--sidebar-width);
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  z-index: 900;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.app-sidebar.collapsed {
+  transform: translateX(-100%);
+}
+
+.sidebar-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 14px 10px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  border-bottom: 2px solid transparent;
+}
+
+.tab-btn.active {
+  color: #38bdf8;
+  border-bottom-color: #38bdf8;
+  background: rgba(14, 165, 233, 0.05);
+}
+
+.sidebar-search-box {
+  padding: 16px 20px 10px 20px;
+}
+
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input-wrapper span {
+  position: absolute;
+  left: 12px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 12px 10px 36px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.search-input:focus {
+  border-color: var(--accent-cyan);
+}
+
+/* Filtros por estado */
+.filters-bar {
+  display: flex;
+  gap: 6px;
+  padding: 0 20px 14px 20px;
+  overflow-x: auto;
+}
+
+.filter-chip {
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.filter-chip.active {
+  background: rgba(14, 165, 233, 0.2);
+  color: #38bdf8;
+  border-color: rgba(14, 165, 233, 0.5);
+}
+
+.filter-chip:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Listas scrolleables */
+.sidebar-content-pane {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 20px 30px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Tarjeta de Manzana */
+.manzana-card {
+  background: var(--bg-glass-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.manzana-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(56, 189, 248, 0.4);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.manzana-card.selected {
+  border-color: #38bdf8;
+  background: rgba(14, 165, 233, 0.12);
+  box-shadow: var(--shadow-glow);
+}
+
+.manzana-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.manzana-num {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #ffffff;
+}
+
+.badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.badge-warning {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badge-info {
+  background: rgba(59, 130, 246, 0.18);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.badge-success {
+  background: rgba(16, 185, 129, 0.18);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge-danger {
+  background: rgba(239, 68, 68, 0.18);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.manzana-calles {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+  line-height: 1.35;
+}
+
+.manzana-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 8px;
+  font-size: 0.74rem;
+}
+
+.driver-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+}
+
+.driver-color-bullet {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.package-count {
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+/* Tarjeta de Conductor */
+.driver-card {
+  background: var(--bg-glass-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.driver-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.driver-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.driver-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+
+.driver-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #ffffff;
+}
+
+.driver-vehicle {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.driver-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+}
+
+.driver-stat-item span:first-child {
+  color: var(--text-muted);
+  display: block;
+}
+
+.driver-stat-item span:last-child {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+/* ========================================================
+   CONTENEDOR DEL MAPA LEAFLET
+   ======================================================== */
+.map-wrapper {
+  flex: 1;
+  position: relative;
+  background: #090d16;
+  height: 100%;
+  min-height: 100%;
+}
+
+#map {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+/* Controles flotantes en el mapa */
+.map-floating-controls {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 800;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.map-control-btn {
+  background: var(--bg-glass);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: var(--shadow-subtle);
+  transition: all 0.2s ease;
+}
+
+.map-control-btn:hover {
+  background: var(--bg-surface-elevated);
+  border-color: var(--border-highlight);
+  color: #38bdf8;
+}
+
+/* Toggle del Sidebar para pantallas chicas */
+.sidebar-toggle-btn {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 800;
+}
+
+/* Estilización personalizada de popups Leaflet */
+.leaflet-popup-content-wrapper {
+  background: #111827 !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(56, 189, 248, 0.3) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7) !important;
+  padding: 0 !important;
+}
+
+.leaflet-popup-tip {
+  background: #111827 !important;
+}
+
+.popup-container {
+  padding: 16px;
+  min-width: 240px;
+}
+
+.popup-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.popup-calles {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.popup-btn-action {
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, #0284c7, #2563eb);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+/* ========================================================
+   MODALES Y DIÁLOGOS
+   ======================================================== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.modal-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modal-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 520px;
+  box-shadow: var(--shadow-modal);
+  transform: translateY(20px);
+  transition: transform 0.25s ease;
+  overflow: hidden;
+}
+
+.modal-overlay.open .modal-card {
+  transform: translateY(0);
+}
+
+.modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.modal-body {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.form-input, .form-select, .form-textarea {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  border-color: var(--accent-cyan);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #0ea5e9, #2563eb);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 10px 18px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px 18px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* Banner de información Supabase en modal */
+.info-callout {
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  background: rgba(14, 165, 233, 0.1);
+  border: 1px solid rgba(14, 165, 233, 0.25);
+  font-size: 0.78rem;
+  color: #bae6fd;
+  line-height: 1.4;
+}
+
+.info-callout code {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #38bdf8;
+}
+
+/* Toast de notificación */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toast {
+  background: #1e293b;
+  border: 1px solid var(--border-color);
+  padding: 12px 18px;
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: slideInToast 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.toast.success { border-color: rgba(16, 185, 129, 0.5); }
+.toast.error { border-color: rgba(239, 68, 68, 0.5); }
+.toast.info { border-color: rgba(14, 165, 233, 0.5); }
+
+@keyframes slideInToast {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Responsividad */
+@media (max-width: 900px) {
+  .app-sidebar {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 85vw;
+    max-width: 380px;
+    box-shadow: 10px 0 30px rgba(0,0,0,0.7);
+  }
+  .header-stats {
+    display: none;
+  }
+}
+
+/* ========================================================
+   ESTILOS OFICIALES DE IMPRESIÓN - FORMULARIO S-13 (A4)
+   "REGISTRO DE ASIGNACIÓN DE TERRITORIO" (S-13-S 1/22)
+   ======================================================== */
+
+/* Contenedor oculto para renderizado de html2pdf */
+#s13-print-render-target {
+  position: absolute;
+  left: -99999px;
+  top: -99999px;
+  width: 210mm;
+  background: #ffffff;
+  color: #000000;
+}
+
+/* Hoja A4 estricta */
+.s13-sheet {
+  width: 210mm;
+  min-height: 297mm;
+  height: 297mm;
+  padding: 10mm 10mm 8mm 10mm;
+  background: #ffffff;
+  color: #000000;
+  box-sizing: border-box;
+  font-family: Arial, Helvetica, sans-serif;
+  position: relative;
+  margin: 0 auto 20px auto;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+  page-break-after: always;
+  break-after: page;
+}
+
+.s13-header {
+  margin-bottom: 6px;
+}
+
+.s13-title {
+  font-size: 13pt;
+  font-weight: bold;
+  text-align: center;
+  margin: 0 0 6px 0;
+  color: #000000;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.s13-service-year-container {
+  font-size: 9.5pt;
+  font-weight: bold;
+  color: #000000;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.s13-service-year-label {
+  color: #000000;
+}
+
+.s13-service-year-line {
+  border-bottom: 1.5px solid #000000;
+  min-width: 90px;
+  display: inline-block;
+  padding: 0 4px;
+}
+
+/* Tabla S-13 */
+.s13-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 2px solid #000000;
+  font-family: Arial, Helvetica, sans-serif;
+  table-layout: fixed;
+  background-color: #ffffff;
+}
+
+.s13-table th, 
+.s13-table td {
+  border: 1px solid #000000;
+  padding: 1px 2px;
+  text-align: center;
+  vertical-align: middle;
+  color: #000000;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+}
+
+/* Cabeceras de tabla */
+.s13-th-cell {
+  background-color: #ffffff;
+  color: #000000;
+}
+
+.s13-th-top th {
+  height: 22px;
+  font-size: 7.5pt;
+  line-height: 1.1;
+  font-weight: bold;
+}
+
+.s13-th-bottom th {
+  height: 20px;
+  font-size: 6.8pt;
+  line-height: 1.1;
+  font-weight: normal;
+}
+
+/* Anchos de columnas */
+.s13-col-num {
+  width: 7%;
+  font-weight: bold;
+  font-size: 8.5pt;
+}
+
+.s13-col-last-date {
+  width: 13%;
+  font-size: 7.5pt;
+}
+
+.s13-col-block-head {
+  width: 20%;
+  font-size: 8pt;
+  font-weight: bold;
+}
+
+.s13-col-sub {
+  width: 10%;
+}
+
+.s13-border-right-thick {
+  border-right: 2.5px solid #000000 !important;
+}
+
+/* Filas de datos de territorios */
+.s13-row-name td {
+  height: 16px;
+  font-size: 7.5pt;
+  font-weight: 500;
+  text-align: left;
+  padding-left: 4px;
+}
+
+.s13-row-name .s13-col-num,
+.s13-row-name .s13-col-last-date {
+  text-align: center;
+  padding-left: 2px;
+}
+
+.s13-row-dates td {
+  height: 14px;
+  font-size: 7pt;
+  text-align: center;
+}
+
+.s13-border-bottom-item td {
+  border-bottom: 1.5px solid #000000 !important;
+}
+
+/* Pie de página S-13 */
+.s13-footer {
+  margin-top: 4px;
+  color: #000000;
+  line-height: 1.25;
+}
+
+.s13-footer-note {
+  font-size: 7.2pt;
+  color: #000000;
+}
+
+.s13-footer-code {
+  font-size: 7.5pt;
+  margin-top: 3px;
+  color: #000000;
+  font-weight: normal;
+}
+
+/* Modal del visor S-13 en la app */
+.s13-modal-card {
+  max-width: 900px;
+  width: 95vw;
+}
+
+.s13-preview-scroll {
+  max-height: 68vh;
+  overflow-y: auto;
+  background: #334155;
+  padding: 20px;
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.s13-preview-scroll .s13-sheet {
+  /* Escalar visualmente para encajar en el modal */
+  transform-origin: top center;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* Reglas nativas para Ctrl + P / Imprimir */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  #s13-print-render-target,
+  #s13-print-render-target * {
+    visibility: visible !important;
+  }
+  #s13-print-render-target {
+    position: static !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+  }
+  .s13-sheet {
+    box-shadow: none !important;
+    margin: 0 !important;
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+}
+

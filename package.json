@@ -1,0 +1,24 @@
+{
+  "name": "app-territorios-rojas",
+  "version": "1.0.0",
+  "description": "Aplicación de control territorial para conductores de reparto en Rojas con conexión a Supabase y Leaflet",
+  "type": "module",
+  "scripts": {
+    "start": "npx serve .",
+    "dev": "npx serve ."
+  },
+  "keywords": [
+    "reparto",
+    "rojas",
+    "territorios",
+    "manzanas",
+    "supabase",
+    "leaflet",
+    "maps"
+  ],
+  "author": "Operaciones Equipo Román Suárez",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1"
+  }
+}

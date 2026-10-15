@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description"
+    content="Sistema de control territorial y gestión de reparto por manzanas en Rojas, Buenos Aires con sincronización Supabase.">
+  <title>Control Territorial de Reparto • Rojas</title>
+
+  <!-- Google Fonts: Outfit & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap"
+    rel="stylesheet">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- Estilos propios -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <div class="app-container">
+
+    <!-- HEADER SUPERIOR -->
+    <header class="app-header">
+      <div class="brand-section">
+        <button id="btn-toggle-sidebar" class="btn-icon" title="Alternar panel lateral">☰</button>
+        <div class="brand-logo-icon">🗺️</div>
+        <div>
+          <h1 class="brand-title">Control Territorial</h1>
+          <div class="brand-subtitle">
+            Reparto Urbano <span class="brand-city-badge">Rojas, Bs. As.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Métricas rápidas en barra superior -->
+      <div class="header-stats">
+        <div class="stat-pill" title="Total de manzanas mapeadas">
+          <span class="stat-dot total"></span>
+          <span>Total: <span id="stat-total" class="stat-val">0</span></span>
+        </div>
+        <div class="stat-pill" title="Manzanas pendientes de entrega">
+          <span class="stat-dot pendiente"></span>
+          <span>Pendientes: <span id="stat-pendientes" class="stat-val">0</span></span>
+        </div>
+        <div class="stat-pill" title="Manzanas en curso de reparto">
+          <span class="stat-dot reparto"></span>
+          <span>En reparto: <span id="stat-reparto" class="stat-val">0</span></span>
+        </div>
+        <div class="stat-pill" title="Manzanas completadas hoy">
+          <span class="stat-dot entregado"></span>
+          <span>Entregadas: <span id="stat-completadas" class="stat-val">0</span></span>
+        </div>
+      </div>
+
+      <!-- Acciones y estado de Supabase -->
+      <div class="header-actions">
+        <button id="btn-open-s13" class="btn-primary"
+          style="display:flex;align-items:center;gap:6px;padding:7px 14px;font-size:0.8rem;background:linear-gradient(135deg, #059669, #0284c7);border:none;box-shadow:0 2px 10px rgba(5,150,105,0.35);cursor:pointer;"
+          title="Reporte Oficial S-13 (Registro de Asignación de Territorio)">
+          <span>📄</span> <span>Reporte S-13</span>
+        </button>
+        <div id="btn-supabase-status" class="supabase-status-pill" title="Configurar conexión de Supabase">
+          <span class="status-indicator checking"></span>
+          <span class="status-label">Verificando Supabase...</span>
+        </div>
+        <button id="btn-open-settings" class="btn-icon" title="Ajustes de conexión y API">⚙️</button>
+      </div>
+    </header>
+
+    <!-- CUERPO DE LA APP -->
+    <main class="app-body">
+
+      <!-- PANEL LATERAL (SIDEBAR) -->
+      <aside id="sidebar" class="app-sidebar">
+        <!-- Pestañas -->
+        <div class="sidebar-tabs">
+          <button class="tab-btn active" data-tab="manzanas">
+            <span>📐 Manzanas</span>
+          </button>
+          <button class="tab-btn" data-tab="conductores">
+            <span>🛵 Conductores</span>
+          </button>
+        </div>
+
+        <!-- Buscador -->
+        <div class="sidebar-search-box">
+          <div class="search-input-wrapper">
+            <span>🔍</span>
+            <input type="text" id="search-input" class="search-input" placeholder="Buscar manzana, calle o barrio..."
+              aria-label="Buscar en territorio">
+          </div>
+        </div>
+
+        <!-- Chips de Filtro -->
+        <div class="filters-bar" id="filters-container">
+          <button class="filter-chip active" data-filter="todas">Todas</button>
+          <button class="filter-chip" data-filter="pendiente">Pendientes</button>
+          <button class="filter-chip" data-filter="en_reparto">En Reparto</button>
+          <button class="filter-chip" data-filter="completada">Entregadas</button>
+          <button class="filter-chip" data-filter="alerta">Alertas</button>
+        </div>
+
+        <!-- Lista scrolleable de elementos -->
+        <div id="sidebar-items-container" class="sidebar-content-pane">
+          <!-- Renderizado dinámico desde app.js -->
+        </div>
+      </aside>
+
+      <!-- ÁREA DEL MAPA INTERACTIVO -->
+      <section class="map-wrapper" aria-label="Mapa territorial de Rojas">
+        <div id="map"></div>
+
+        <!-- Botones flotantes sobre el mapa -->
+        <div class="map-floating-controls">
+          <button id="btn-center-rojas" class="map-control-btn" title="Re-centrar en el centro de Rojas">
+            <span>📍</span> Centrar Rojas
+          </button>
+          <button id="btn-toggle-tiles" class="map-control-btn" title="Cambiar estilo de mapa (Satélite / Vector)">
+            <span>🗺️</span> Cambiar Capa
+          </button>
+        </div>
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- ========================================================
+       MODAL: DETALLE / EDICIÓN DE MANZANA
+       ======================================================== -->
+  <div id="modal-manzana" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="modal-m-title" class="modal-title">Detalle de Manzana</h2>
+        <button class="btn-icon" data-close-modal="modal-manzana">✕</button>
+      </div>
+      <div class="modal-body">
+
+
+        <!-- ESTADO DE LA PREDICACIÓN EN LA MANZANA -->
+        <div class="form-group">
+          <label class="form-label" for="modal-m-estado">Estado de Cobertura</label>
+          <select id="modal-m-estado" class="form-select">
+            <option value="pendiente">🟡 Pendiente (Sin Trabajar)</option>
+            <option value="en_reparto">🔵 En Proceso (Abierto)</option>
+            <option value="completada">🟢 Completada (Barrida/Predicada)</option>
+            <option value="alerta">🔴 Revisión Especial / Alerta</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="modal-m-conductor">Conductor del Grupo</label>
+          <select id="modal-m-conductor" class="form-select">
+            <option value="">-- Sin asignar --</option>
+            <option value="C-01">Antonini, Gustavo (C-01)</option>
+            <option value="C-02">Aranda, Luis Alejandro (C-02)</option>
+            <option value="C-03">Blázquez, Daniel Omar (C-03)</option>
+            <option value="C-04">Casanova, Roberto Daniel (C-04)</option>
+            <option value="C-05">Castro, Esteban Román (C-05)</option>
+            <option value="C-06">Enrique, Andrés (C-06)</option>
+            <option value="C-07">Fontanet, Hernán Darío (C-07)</option>
+            <option value="C-08">Fontanet, Juan Pablo (C-08)</option>
+            <option value="C-09">García, Ramón Galo (C-09)</option>
+            <option value="C-10">Ghirardi, Mauricio Juan (C-10)</option>
+            <option value="C-11">Lomónico, Rodolfo V. (C-11)</option>
+            <option value="C-12">Montiel Duré, Lucio (C-12)</option>
+            <option value="C-13">Ruiz, Matias (C-13)</option>
+            <option value="C-14">Suárez Cejas, Román Ezequiel (C-14)</option>
+            <option value="C-15">Vezzoni, Lucas Ezequiel (C-15)</option>
+            <option value="C-16">Vezzoni, Miguel Ángel (C-16)</option>
+            <option value="C-17">Villaroel, Damián (C-17)</option>
+            <option value="C-18">Vizcaino, Mario Antonio (C-18)</option>
+
+          </select>
+        </div>
+
+        <!-- NOTAS DEL TERRITORIO -->
+        <div class="form-group">
+          <label class="form-label" for="modal-m-observaciones">Notas de Predicación</label>
+          <textarea id="modal-m-observaciones" class="form-control" rows="3"
+            placeholder="Ej: Territorio rural, perros sueltos, departamentos con timbre roto..."></textarea>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" data-close-modal="modal-manzana">Cancelar</button>
+        <button id="btn-save-manzana" class="btn-primary">Guardar Cambios</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================
+       MODAL: CONFIGURACIÓN Y ESTADO DE SUPABASE
+       ======================================================== -->
+  <div id="modal-config" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title">⚡ Conexión con Supabase</h2>
+        <button class="btn-icon" data-close-modal="modal-config">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="info-callout">
+          Las credenciales se toman del archivo <code>.env</code>. Podés actualizar o probar la conexión a tu proyecto
+          en tiempo real aquí.
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="cfg-supabase-url">SUPABASE_URL</label>
+          <input type="text" id="cfg-supabase-url" class="form-input" placeholder="https://xyzcompany.supabase.co">
+          <small style="color: var(--text-muted); font-size: 0.72rem;">La URL completa de tu proyecto en
+            Supabase.</small>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="cfg-supabase-key">SUPABASE_KEY (Anon / Publishable)</label>
+          <input type="password" id="cfg-supabase-key" class="form-input" placeholder="sb_publishable_...">
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 6px;">
+          <button id="btn-test-config" class="btn-secondary" style="font-size: 0.78rem;">🔌 Probar Conexión</button>
+          <span id="cfg-test-status" style="font-size: 0.78rem; font-weight: 600;"></span>
+        </div>
+
+        <div class="info-callout"
+          style="background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.25); color: #a7f3d0;">
+          💡 ¿Necesitás crear las tablas en Supabase? El archivo <code>schema.sql</code> en este proyecto contiene el
+          script listo para ejecutar en el SQL Editor de tu Dashboard.
+        </div>
+
+        <!-- Sección de Administración de Reportes -->
+        <div style="border-top: 1px solid var(--border-color); padding-top: 14px; margin-top: 10px;">
+          <label class="form-label" style="display:flex;align-items:center;gap:6px;font-weight:700;">
+            <span>📋</span> Reportes de Administración Territorial
+          </label>
+          <button id="btn-admin-open-s13" class="btn-secondary"
+            style="width:100%;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(5,150,105,0.15);border-color:rgba(5,150,105,0.4);color:#6ee7b7;">
+            <span>📄</span> Descargar Reporte Imprimible S-13 (PDF)
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" data-close-modal="modal-config">Cerrar</button>
+        <button id="btn-save-config" class="btn-primary">Guardar y Reconectar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================
+       MODAL: REPORTE S-13 (REGISTRO DE ASIGNACIÓN DE TERRITORIO)
+       ======================================================== -->
+  <div id="modal-s13" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-card s13-modal-card">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" style="display:flex;align-items:center;gap:8px;">
+            <span>📋</span> Registro de Asignación de Territorio (S-13)
+          </h2>
+          <small style="color:var(--text-muted);font-size:0.75rem;">Formato físico oficial S-13-S 1/22 configurado en
+            Hoja A4 vertical</small>
+        </div>
+        <button class="btn-icon" data-close-modal="modal-s13">✕</button>
+      </div>
+
+      <!-- Barra de herramientas del reporte -->
+      <div
+        style="padding:14px 24px;background:rgba(0,0,0,0.25);border-bottom:1px solid var(--border-color);display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;">
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <label for="s13-input-year" style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);">Año de
+              servicio:</label>
+            <input type="text" id="s13-input-year" class="form-input" value="2026"
+              style="width:85px;padding:6px 10px;text-align:center;font-weight:700;">
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <label for="s13-select-page"
+              style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);">Página:</label>
+            <select id="s13-select-page" class="form-select" style="padding:6px 10px;font-size:0.8rem;">
+              <option value="-1">Todas las hojas (Completo)</option>
+              <option value="0" selected>Página 1 (Territorios 1 a 24)</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;">
+          <button id="btn-print-s13" class="btn-secondary"
+            style="font-size:0.8rem;display:flex;align-items:center;gap:6px;" title="Imprimir directamente">
+            <span>🖨️</span> Imprimir
+          </button>
+          <button id="btn-download-s13-pdf" class="btn-primary"
+            style="display:flex;align-items:center;gap:6px;background:linear-gradient(135deg, #059669, #0284c7);box-shadow:0 2px 10px rgba(5,150,105,0.4);"
+            title="Descargar archivo PDF A4 listo para imprimir">
+            <span>📥</span> <span>Descargar Reporte Imprimible S-13</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Área de vista previa del formulario físico -->
+      <div class="modal-body" style="padding:16px 24px;background:#0f172a;">
+        <div id="s13-preview-container" class="s13-preview-scroll">
+          <!-- Renderizado dinámico de la hoja S-13 -->
+        </div>
+      </div>
+
+      <div class="modal-footer" style="justify-content:space-between;align-items:center;">
+        <span style="font-size:0.75rem;color:var(--text-muted);">
+          ℹ️ La plantilla se autocompleta con datos históricos de la tabla <code>historial_s13</code> de Supabase.
+        </span>
+        <button class="btn-secondary" data-close-modal="modal-s13">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contenedor oculto estricto para renderizado de html2pdf -->
+  <div id="s13-print-render-target"></div>
+
+  <!-- Contenedor de notificaciones Toast -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- html2pdf.js Bundle Oficial (CDN) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <!-- Supabase JS Oficial CDN (expone window.supabase) -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Scripts de la Aplicación en orden de dependencia -->
+  <!-- Sistema de autenticación (debe cargarse primero) -->
+  <script src="./auth.js"></script>
+
+  <script src="./env.js"></script>
+  <script src="./config.js"></script>
+  <script src="./manzanasData.js"></script>
+  <script src="./supabaseClient.js"></script>
+  <script src="./s13Report.js"></script>
+  <script src="./app.js"></script>
+</body>
+
+</html>
