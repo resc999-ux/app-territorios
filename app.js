@@ -35,58 +35,65 @@
     alerta: { fill: '#ef4444', border: '#dc2626', label: 'Con Alerta', badgeClass: 'badge-danger' }
   };
 
-  // ── Paleta de 61 colores distintos por numero de fraccion (del 1 al 61) ──
-  // Generada con tonos HSL distribuidos uniformemente para maxima distincion visual
-  const FRACCION_COLORES = (() => {
-    const palette = {};
-    const baseHues = [
-       0,   6,  12,  18,  24,  32,  40,  48,  56,  64,
-      72,  80,  90, 100, 110, 120, 130, 140, 150, 160,
-     170, 180, 190, 200, 210, 218, 226, 234, 242, 250,
-     258, 266, 274, 280, 286, 292, 298, 304, 310, 316,
-     322, 328, 334, 340, 346, 352, 358,   4,  10,  22,
-      36,  50,  66,  82, 100, 120, 144, 162, 182, 200, 220
-    ];
-    const lightness = [
-      52, 55, 58, 52, 55, 60, 52, 56, 52, 58,
-      52, 55, 52, 55, 52, 50, 52, 55, 52, 55,
-      52, 52, 55, 52, 55, 52, 55, 52, 55, 52,
-      55, 52, 55, 52, 55, 52, 55, 52, 55, 52,
-      55, 52, 55, 52, 55, 52, 55, 56, 52, 55,
-      52, 55, 52, 55, 52, 50, 52, 55, 52, 55, 52
-    ];
-    for (let i = 0; i < 61; i++) {
-      const h = baseHues[i];
-      const s = 70 + (i % 3) * 5;  // 70-80% saturacion
-      const l = lightness[i];
-      palette[i + 1] = `hsl(${h}, ${s}%, ${l}%)`;
-    }
-    return palette;
-  })();
+  // ── Paleta oficial de colores originales de Google My Maps (Rojas Bs As - 61 Fracciones) ──
+  const FRACCION_ORIGINAL_COLORES = (ManzanasData && ManzanasData.FRACCION_ORIGINAL_COLORES) || {
+    1: '#4ade80',  2: '#818cf8',  3: '#fbbf24',  4: '#38bdf8',  5: '#f472b6',  6: '#a3e635',
+    7: '#a78bfa',  8: '#fb923c',  9: '#2dd4bf', 10: '#f87171', 11: '#c084fc', 12: '#facc15',
+    13: '#60a5fa', 14: '#34d399', 15: '#e879f9', 16: '#f97316', 17: '#06b6d4', 18: '#e11d48',
+    19: '#84cc16', 20: '#6366f1', 21: '#eab308', 22: '#14b8a6', 23: '#ec4899', 24: '#0284c7',
+    25: '#d97706', 26: '#10b981', 27: '#8b5cf6', 28: '#f59e0b', 29: '#0ea5e9', 30: '#ef4444',
+    31: '#22c55e', 32: '#a855f7', 33: '#f9a8d4', 34: '#059669', 35: '#3b82f6', 36: '#ea580c',
+    37: '#10b981', 38: '#7c3aed', 39: '#fcd34d', 40: '#2563eb', 41: '#f43f5e', 42: '#84cc16',
+    43: '#9333ea', 44: '#fdba74', 45: '#0891b2', 46: '#be123c', 47: '#65a30d', 48: '#4f46e5',
+    49: '#ca8a04', 50: '#0d9488', 51: '#db2777', 52: '#1d4ed8', 53: '#d97706', 54: '#16a34a',
+    55: '#9333ea', 56: '#f59e0b', 57: '#0284c7', 58: '#dc2626', 59: '#6ee7b7', 60: '#c084fc',
+    61: '#fed7aa'
+  };
 
-  // Extraer numero de fraccion desde el campo nombre_manzana o fraccion de la manzana
+  // Identifica si un registro corresponde al perímetro macro de una Fracción
+  function esFraccionBoundary(manzana) {
+    if (!manzana) return false;
+    const name = String(manzana.nombre_manzana || manzana.numero_manzana || '').trim();
+    return /^(?:Fracci[oó]n|Frac\.?)\s*\d+/i.test(name);
+  }
+
+  // Extraer número de fracción desde nombre_manzana ("1 - A", "Fracción 1", etc.)
   function getFraccionNumero(manzana) {
     if (!manzana) return null;
-    // Buscar en propiedades GeoJSON
     const props = manzana.coordenadas?.properties || {};
     if (props.fraccion) return parseInt(props.fraccion, 10);
     if (props.num_territorio) return parseInt(props.num_territorio, 10);
-    // Buscar en numero_manzana: "1 - Zona A" o "F1" o "T-01"
-    const num = manzana.numero_manzana || manzana.nombre_manzana || '';
-    const match = num.match(/^(\d{1,2})\s*[-–]/);
-    if (match) return parseInt(match[1], 10);
-    const matchF = num.match(/[Ff]?[-]?(\d{1,2})/);
+
+    const num = String(manzana.nombre_manzana || manzana.numero_manzana || '').trim();
+
+    // 1. "Fracción 1", "Fraccion 12", "F-12"
+    const matchF = num.match(/^(?:Fracci[oó]n|Frac\.?|F)\s*[-]?(\d+)/i);
     if (matchF) return parseInt(matchF[1], 10);
-    // Usar fraccion_id o territorio directo
+
+    // 2. "1 - A", "12 - B", "3-C"
+    const matchDash = num.match(/^(\d+)\s*[-–]/);
+    if (matchDash) return parseInt(matchDash[1], 10);
+
+    // 3. Fallbacks
     if (manzana.fraccion_id) return parseInt(manzana.fraccion_id, 10);
     if (manzana.num_territorio) return parseInt(manzana.num_territorio, 10);
+
+    const matchLeadNum = num.match(/^(\d+)/);
+    if (matchLeadNum) return parseInt(matchLeadNum[1], 10);
+
     return null;
   }
 
   function getColorPorFraccion(manzana) {
     const num = getFraccionNumero(manzana);
-    if (num && FRACCION_COLORES[num]) return FRACCION_COLORES[num];
-    return '#94a3b8'; // gris neutro si no se puede determinar la fraccion
+    if (num && FRACCION_ORIGINAL_COLORES[num]) {
+      return FRACCION_ORIGINAL_COLORES[num];
+    }
+    if (num) {
+      const triad = ['#8cc86e', '#2a9bf5', '#f5963c'];
+      return triad[(num - 1) % 3];
+    }
+    return '#8cc86e'; // Verde original de origen
   }
 
 
@@ -223,14 +230,16 @@
     }
 
     if (style === 'satellite') {
-      state.tileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        attribution: '&copy; Esri &copy; DigitalGlobe',
-        maxZoom: 19
+      state.tileLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+        attribution: '&copy; Google Maps',
+        maxZoom: 20,
+        subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
       });
     } else {
-      state.tileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-        attribution: '&copy; Esri, DeLorme, HERE, OpenStreetMap',
-        maxZoom: 19
+      state.tileLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        attribution: '&copy; Google Maps',
+        maxZoom: 20,
+        subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
       });
     }
 
@@ -338,19 +347,39 @@
   function normalizeManzanaRecord(raw, index) {
     if (!raw) return null;
     const id = raw.id || raw.gid || raw.ogc_fid || raw.cartodb_id || `manzana-${index}`;
-    const numero = raw.numero_manzana || raw.manzana || raw.nro_manzana || raw.cod_manzana || raw.nombre || raw.name || `M-${index + 1}`;
-    const barrio = raw.barrio || raw.seccion || raw.circ || raw.zona || 'Rojas';
+    // Omitir registro de prueba que cubre todo Rojas con un polígono ficticio de 1km
+    if (String(raw.nombre_manzana || '').includes('Prueba') || String(id) === '1') {
+      return null;
+    }
+
+    // Columna nombre_manzana de Supabase contiene el nombre real ("1 - A", "Fracción 1", etc.)
+    const nombreReal = String(raw.nombre_manzana || raw.numero_manzana || raw.manzana || raw.nro_manzana || raw.nombre || raw.name || `M-${index + 1}`).trim();
+    const isBoundary = esFraccionBoundary({ nombre_manzana: nombreReal });
+    const barrio = raw.barrio || raw.seccion || raw.circ || raw.zona || (isBoundary ? 'Límite Sector' : 'Rojas');
     const calles = raw.calles || raw.calle || raw.domicilio || raw.direccion || raw.descripcion || 'Sin referencia';
     const estado = (raw.estado && ESTADO_COLORES[raw.estado]) ? raw.estado : 'pendiente';
-    const total_paquetes = Number(raw.total_paquetes ?? raw.paquetes ?? 0) || 0;
-    const paquetes_entregados = Number(raw.paquetes_entregados ?? 0) || 0;
+
+    // Parseo seguro de paquetes (soporta número o string "entregados/totales", ej "0/0")
+    let total_paquetes = 0;
+    let paquetes_entregados = 0;
+    if (typeof raw.paquetes === 'string' && raw.paquetes.includes('/')) {
+      const parts = raw.paquetes.split('/');
+      paquetes_entregados = Number(parts[0]) || 0;
+      total_paquetes = Number(parts[1]) || 0;
+    } else {
+      total_paquetes = Number(raw.total_paquetes ?? raw.paquetes_totales ?? raw.paquetes ?? 0) || 0;
+      paquetes_entregados = Number(raw.paquetes_entregados ?? raw.entregados_paquetes ?? 0) || 0;
+    }
+
     const conductor_id = raw.conductor_id || raw.repartidor_id || null;
     const notas = raw.notas || '';
 
     return {
       ...raw,
       id: String(id),
-      numero_manzana: String(numero),
+      nombre_manzana: nombreReal,
+      numero_manzana: nombreReal,
+      es_fraccion: isBoundary,
       barrio: String(barrio),
       calles: String(calles),
       estado,
@@ -378,108 +407,109 @@
 
       let validLayersCount = 0;
 
-      // 1. Dibujar manzanas con color por fraccion + etiqueta de numero
-      state.manzanas.forEach(manzana => {
+      // Ordenar: primero los perímetros de Fracción (al fondo), luego las manzanas individuales (arriba)
+      const sortedManzanas = [...state.manzanas].sort((a, b) => {
+        const aIsFrac = a?.es_fraccion || esFraccionBoundary(a);
+        const bIsFrac = b?.es_fraccion || esFraccionBoundary(b);
+        if (aIsFrac && !bIsFrac) return -1;
+        if (!aIsFrac && bIsFrac) return 1;
+        return 0;
+      });
+
+      // 1. Dibujar manzanas con colores de Google My Maps y etiquetas correspondientes
+      sortedManzanas.forEach(manzana => {
         if (!manzana) return;
         const geoData = extractGeoJSON(manzana);
         if (!geoData) return;
 
-        const estadoInfo = ESTADO_COLORES[manzana.estado] || ESTADO_COLORES.pendiente;
+        const isFraccion = manzana.es_fraccion || esFraccionBoundary(manzana);
         const isSelected = state.selectedManzanaId === manzana.id;
-
-        // Color base por fraccion; si esta seleccionada o en alerta, el borde cambia
+        const fraccionNum = getFraccionNumero(manzana);
         const fraccionColor = getColorPorFraccion(manzana);
+        const estadoInfo = ESTADO_COLORES[manzana.estado] || ESTADO_COLORES.pendiente;
 
-        // La opacidad del relleno varía por estado:
-        // - pendiente: color fraccion, semi-transparente
-        // - en_reparto: color fraccion, mas opaco
-        // - completada: verde solido
-        // - alerta: rojo solido
-        let fillColor, fillOpacity, borderColor, borderWeight;
-        if (manzana.estado === 'completada') {
-          fillColor = estadoInfo.fill;   // verde
-          fillOpacity = isSelected ? 0.80 : 0.60;
-          borderColor = isSelected ? '#38bdf8' : estadoInfo.border;
-          borderWeight = isSelected ? 3 : 1.5;
-        } else if (manzana.estado === 'alerta') {
-          fillColor = estadoInfo.fill;   // rojo
-          fillOpacity = isSelected ? 0.85 : 0.65;
-          borderColor = isSelected ? '#38bdf8' : estadoInfo.border;
-          borderWeight = isSelected ? 3 : 2;
-        } else if (manzana.estado === 'en_reparto') {
-          fillColor = fraccionColor;     // color de la fraccion
-          fillOpacity = isSelected ? 0.82 : 0.62;
-          borderColor = isSelected ? '#38bdf8' : '#1d4ed8';
-          borderWeight = isSelected ? 3 : 2;
-        } else {
-          // pendiente: color de la fraccion, mas transparente
+        let fillColor, fillOpacity, borderColor, borderWeight, dashArray;
+
+        if (isFraccion) {
+          // Las 61 Fracciones o Territorios principales: color distintivo visible
           fillColor = fraccionColor;
-          fillOpacity = isSelected ? 0.60 : 0.38;
-          borderColor = isSelected ? '#38bdf8' : 'rgba(0,0,0,0.35)';
-          borderWeight = isSelected ? 3 : 1;
+          fillOpacity = isSelected ? 0.75 : 0.52;
+          borderColor = isSelected ? '#38bdf8' : '#0f172a';
+          borderWeight = isSelected ? 3.5 : 2;
+          dashArray = null;
+        } else {
+          // Manzanas individuales interiores: división sutil sin saturar
+          dashArray = null;
+          if (manzana.estado === 'completada') {
+            fillColor = estadoInfo.fill; // Verde esmeralda #10b981
+            fillOpacity = isSelected ? 0.88 : 0.70;
+            borderColor = isSelected ? '#38bdf8' : estadoInfo.border;
+            borderWeight = isSelected ? 3 : 1.5;
+          } else if (manzana.estado === 'alerta') {
+            fillColor = estadoInfo.fill; // Rojo alerta #ef4444
+            fillOpacity = isSelected ? 0.90 : 0.75;
+            borderColor = isSelected ? '#38bdf8' : estadoInfo.border;
+            borderWeight = isSelected ? 3 : 2;
+          } else if (manzana.estado === 'en_reparto') {
+            fillColor = fraccionColor;
+            fillOpacity = isSelected ? 0.85 : 0.65;
+            borderColor = isSelected ? '#38bdf8' : '#1e40af';
+            borderWeight = isSelected ? 3 : 1.5;
+          } else {
+            // pendiente: tono de su fracción pero semi-transparente para ver calles
+            fillColor = fraccionColor;
+            fillOpacity = isSelected ? 0.65 : 0.25;
+            borderColor = isSelected ? '#38bdf8' : 'rgba(0,0,0,0.30)';
+            borderWeight = isSelected ? 2.5 : 1;
+          }
         }
 
         try {
-          // Leaflet con preferCanvas: true renderiza automaticamente en Canvas
           const geoLayer = L.geoJSON(geoData, {
             style: {
               color: borderColor,
               fillColor: fillColor,
               fillOpacity: fillOpacity,
               weight: borderWeight,
-              dashArray: manzana.estado === 'pendiente' ? '4, 4' : null
+              dashArray: dashArray
             }
           });
 
-          // Etiqueta con el numero de manzana/territorio sobre el poligono
-          const labelNum = (() => {
-            const n = getFraccionNumero(manzana);
-            if (n) return String(n);
-            const raw = manzana.numero_manzana || manzana.nombre_manzana || '';
-            // Extraer primeras letras/numeros significativos
-            const short = raw.replace(/\(.*\)/, '').trim();
-            return short.length > 8 ? short.substring(0, 8) : short;
-          })();
+          // Solo colocar el número interior en el centro de cada Fracción (del 1 al 61)
+          // No se colocan carteles a las manzanas individuales para evitar saturar la imagen
+          if (isFraccion && fraccionNum) {
+            try {
+              const bounds = geoLayer.getBounds();
+              if (bounds && bounds.isValid()) {
+                const center = bounds.getCenter();
+                const labelHtml = `<div class="fraccion-centro-numero">${fraccionNum}</div>`;
 
-          // Calcular centroide aproximado del poligono para colocar la etiqueta
-          try {
-            const bounds = geoLayer.getBounds();
-            if (bounds && bounds.isValid()) {
-              const center = bounds.getCenter();
-              const labelMarker = L.marker(center, {
-                icon: L.divIcon({
-                  html: `<div style="
-                    background: rgba(0,0,0,0.65);
-                    color: white;
-                    font-size: 10px;
-                    font-weight: 700;
-                    padding: 1px 4px;
-                    border-radius: 4px;
-                    white-space: nowrap;
-                    pointer-events: none;
-                    border: 1px solid rgba(255,255,255,0.3);
-                    font-family: 'Outfit', 'Inter', sans-serif;
-                    line-height: 1.4;
-                    box-shadow: 0 1px 4px rgba(0,0,0,0.5);
-                  ">${labelNum}</div>`,
-                  className: 'manzana-label-icon',
-                  iconSize: null,
-                  iconAnchor: [0, 0]
-                }),
-                interactive: false,
-                zIndexOffset: 100
-              });
-              labelMarker.addTo(state.manzanasFeatureGroup);
+                const labelMarker = L.marker(center, {
+                  icon: L.divIcon({
+                    html: labelHtml,
+                    className: 'fraccion-centroid-label',
+                    iconSize: [0, 0],
+                    iconAnchor: [0, 0]
+                  }),
+                  interactive: false,
+                  zIndexOffset: 300
+                });
+                labelMarker.addTo(state.manzanasFeatureGroup);
+              }
+            } catch (labelErr) {
+              // Silencioso
             }
-          } catch (labelErr) {
-            // Si el label falla, simplemente no se muestra (no rompe el mapa)
           }
 
+          // Tooltip descriptivo al pasar el cursor o pulsar
           geoLayer.bindTooltip(`
-            <strong>${manzana.numero_manzana || manzana.nombre_manzana}</strong><br/>
-            <small>Barrio: ${manzana.barrio} | Estado: ${estadoInfo.label}</small><br/>
-            <small>📦 Paquetes: ${manzana.paquetes_entregados}/${manzana.total_paquetes}</small>
-          `, { sticky: true, opacity: 0.95 });
+            <div style="font-size:12px; line-height:1.4;">
+              <strong style="color:#38bdf8; font-size:13px;">${rawName}</strong><br/>
+              <span style="color:#cbd5e1;">${isFraccion ? 'Límite Territorial' : 'Fracción ' + (fraccionNum || 'Rojas')}</span><br/>
+              <span style="color:#94a3b8;">Estado:</span> <strong style="color:${fillColor};">${estadoInfo.label}</strong><br/>
+              <span>📦 Paquetes: ${manzana.paquetes_entregados}/${manzana.total_paquetes}</span>
+            </div>
+          `, { className: 'manzana-tooltip', sticky: true, opacity: 0.95 });
 
           geoLayer.on('click', () => {
             selectManzana(manzana.id);
@@ -721,13 +751,20 @@
       const estadoInfo = ESTADO_COLORES[manzana.estado] || ESTADO_COLORES.pendiente;
       const conductor = state.conductores.find(c => c && String(c.id) === String(manzana.conductor_id));
       const isSelected = state.selectedManzanaId === manzana.id;
+      const isFraccion = manzana.es_fraccion || esFraccionBoundary(manzana);
+      const fraccionColor = getColorPorFraccion(manzana);
 
       const card = document.createElement('div');
       card.className = `manzana-card ${isSelected ? 'selected' : ''}`;
       card.innerHTML = `
         <div class="manzana-card-header">
-          <span class="manzana-num">${manzana.numero_manzana}</span>
-          <span class="badge ${estadoInfo.badgeClass}">${estadoInfo.label}</span>
+          <span class="manzana-num" style="display:flex;align-items:center;gap:6px;">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background-color:${fraccionColor};flex-shrink:0;"></span>
+            ${manzana.numero_manzana}
+          </span>
+          <span class="badge ${isFraccion ? 'badge-info' : estadoInfo.badgeClass}">
+            ${isFraccion ? 'Límite Sector' : estadoInfo.label}
+          </span>
         </div>
         <div class="manzana-calles">${manzana.barrio} • ${manzana.calles || 'Sin referencia'}</div>
         <div class="manzana-card-footer">

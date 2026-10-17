@@ -207,11 +207,27 @@ const ESTADO_COLORES = {
   }
 };
 
+// Paleta oficial de 61 colores distintos para cada una de las 61 Fracciones de Rojas
+const FRACCION_ORIGINAL_COLORES = {
+  1: '#4ade80',  2: '#818cf8',  3: '#fbbf24',  4: '#38bdf8',  5: '#f472b6',  6: '#a3e635',
+  7: '#a78bfa',  8: '#fb923c',  9: '#2dd4bf', 10: '#f87171', 11: '#c084fc', 12: '#facc15',
+  13: '#60a5fa', 14: '#34d399', 15: '#e879f9', 16: '#f97316', 17: '#06b6d4', 18: '#e11d48',
+  19: '#84cc16', 20: '#6366f1', 21: '#eab308', 22: '#14b8a6', 23: '#ec4899', 24: '#0284c7',
+  25: '#d97706', 26: '#10b981', 27: '#8b5cf6', 28: '#f59e0b', 29: '#0ea5e9', 30: '#ef4444',
+  31: '#22c55e', 32: '#a855f7', 33: '#f9a8d4', 34: '#059669', 35: '#3b82f6', 36: '#ea580c',
+  37: '#10b981', 38: '#7c3aed', 39: '#fcd34d', 40: '#2563eb', 41: '#f43f5e', 42: '#84cc16',
+  43: '#9333ea', 44: '#fdba74', 45: '#0891b2', 46: '#be123c', 47: '#65a30d', 48: '#4f46e5',
+  49: '#ca8a04', 50: '#0d9488', 51: '#db2777', 52: '#1d4ed8', 53: '#d97706', 54: '#16a34a',
+  55: '#9333ea', 56: '#f59e0b', 57: '#0284c7', 58: '#dc2626', 59: '#6ee7b7', 60: '#c084fc',
+  61: '#fed7aa'
+};
+
 // Exportar global para navegador
 if (typeof window !== 'undefined') {
   window.ManzanasData = {
     CONDUCTORES_DEFAULT,
     MANZANAS_DEFAULT,
-    ESTADO_COLORES
+    ESTADO_COLORES,
+    FRACCION_ORIGINAL_COLORES
   };
 }
