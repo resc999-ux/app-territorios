@@ -68,7 +68,7 @@
           ultima_fecha_completo: isCompletada ? '28/02/26' : (idx % 2 === 0 ? '14/11/25' : ''),
           blocks: [
             {
-              asignado: cond ? cond.nombre : (idx % 3 === 0 ? 'Carlos Mendoza' : (idx % 3 === 1 ? 'Martín Silva' : '')),
+              asignado: cond ? cond.nombre : '',
               fecha_asigno: isEnReparto || isCompletada ? '12/01/26' : '',
               fecha_completo: isCompletada ? '28/02/26' : ''
             },

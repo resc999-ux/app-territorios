@@ -50,14 +50,14 @@
     61: '#fed7aa'
   };
 
-  // Identifica si un registro corresponde al perímetro macro de una Fracción
+  // Identifica si un registro corresponde al perímetro macro de una Fracción (1 al 61)
   function esFraccionBoundary(manzana) {
     if (!manzana) return false;
     const name = String(manzana.nombre_manzana || manzana.numero_manzana || '').trim();
-    return /^(?:Fracci[oó]n|Frac\.?)\s*\d+/i.test(name);
+    return /^(?:Frac|F)/i.test(name) && /\d+/.test(name) && !/[-–]\s*[A-Za-z]/i.test(name);
   }
 
-  // Extraer número de fracción desde nombre_manzana ("1 - A", "Fracción 1", etc.)
+  // Extraer número de fracción desde nombre_manzana ("1 - A", "Fracción 1", "Fraccion 12", etc.)
   function getFraccionNumero(manzana) {
     if (!manzana) return null;
     const props = manzana.coordenadas?.properties || {};
@@ -66,11 +66,13 @@
 
     const num = String(manzana.nombre_manzana || manzana.numero_manzana || '').trim();
 
-    // 1. "Fracción 1", "Fraccion 12", "F-12"
-    const matchF = num.match(/^(?:Fracci[oó]n|Frac\.?|F)\s*[-]?(\d+)/i);
-    if (matchF) return parseInt(matchF[1], 10);
+    // 1. Fracción boundary: "Fracción 1", "Fraccion 12", "Fracci├│n 12", "F 12", etc.
+    if (/^(?:Frac|F)/i.test(num) && !/[-–]\s*[A-Za-z]/i.test(num)) {
+      const matchNum = num.match(/\d+/);
+      if (matchNum) return parseInt(matchNum[0], 10);
+    }
 
-    // 2. "1 - A", "12 - B", "3-C"
+    // 2. Individual manzana: "1 - A", "12 - B", "3-C", "1-A"
     const matchDash = num.match(/^(\d+)\s*[-–]/);
     if (matchDash) return parseInt(matchDash[1], 10);
 
@@ -200,7 +202,7 @@
       center: config.mapCenter || [-34.1977, -60.7337],
       zoom: config.defaultZoom || 15,
       zoomControl: false,
-      preferCanvas: true // Renderizado Canvas nativo para máximo rendimiento
+      preferCanvas: false // Renderizado SVG nativo para interacción táctil y clic perfecta en manzanas interiores
     });
 
     L.control.zoom({ position: 'bottomright' }).addTo(state.map);
@@ -320,25 +322,44 @@
     if (!geo) return null;
     function fixRing(ring) {
       if (!Array.isArray(ring)) return [];
-      return ring.map(pt => {
-        if (!Array.isArray(pt) || pt.length < 2) return pt;
-        let [p0, p1] = pt;
+      const clean = ring.map(pt => {
+        if (!Array.isArray(pt) || pt.length < 2) return null;
+        let p0 = typeof pt[0] === 'number' ? pt[0] : parseFloat(pt[0]);
+        let p1 = typeof pt[1] === 'number' ? pt[1] : parseFloat(pt[1]);
+        if (isNaN(p0) || isNaN(p1)) return null;
+        // Si p0 es latitud (~ -34) y p1 es longitud (~ -60), convertir a [lng, lat]
         if (Math.abs(p0) < 45 && Math.abs(p1) > 55) {
           return [p1, p0];
         }
         return [p0, p1];
-      });
+      }).filter(Boolean);
+
+      if (clean.length >= 3) {
+        const first = clean[0];
+        const last = clean[clean.length - 1];
+        if (first[0] !== last[0] || first[1] !== last[1]) {
+          clean.push([first[0], first[1]]);
+        }
+      }
+      return clean;
     }
 
     if (geo.type === 'Polygon' && Array.isArray(geo.coordinates)) {
+      const fixedCoordinates = geo.coordinates.map(fixRing).filter(r => r.length >= 4);
+      if (fixedCoordinates.length === 0) return null;
       return {
         ...geo,
-        coordinates: geo.coordinates.map(fixRing)
+        coordinates: fixedCoordinates
       };
     } else if (geo.type === 'MultiPolygon' && Array.isArray(geo.coordinates)) {
+      const fixedPolygons = geo.coordinates.map(polygon => {
+        if (!Array.isArray(polygon)) return [];
+        return polygon.map(fixRing).filter(r => r.length >= 4);
+      }).filter(p => p.length > 0);
+      if (fixedPolygons.length === 0) return null;
       return {
         ...geo,
-        coordinates: geo.coordinates.map(polygon => Array.isArray(polygon) ? polygon.map(fixRing) : polygon)
+        coordinates: fixedPolygons
       };
     }
     return geo;
@@ -353,7 +374,9 @@
     }
 
     // Columna nombre_manzana de Supabase contiene el nombre real ("1 - A", "Fracción 1", etc.)
-    const nombreReal = String(raw.nombre_manzana || raw.numero_manzana || raw.manzana || raw.nro_manzana || raw.nombre || raw.name || `M-${index + 1}`).trim();
+    let nombreReal = String(raw.nombre_manzana || raw.numero_manzana || raw.manzana || raw.nro_manzana || raw.nombre || raw.name || `M-${index + 1}`).trim();
+    // Limpiar posibles caracteres rotos de codificación ("Fracci├│n" -> "Fracción")
+    nombreReal = nombreReal.replace(/^Fracci[^\s\d]+n/i, 'Fracción');
     const isBoundary = esFraccionBoundary({ nombre_manzana: nombreReal });
     const barrio = raw.barrio || raw.seccion || raw.circ || raw.zona || (isBoundary ? 'Límite Sector' : 'Rojas');
     const calles = raw.calles || raw.calle || raw.domicilio || raw.direccion || raw.descripcion || 'Sin referencia';
@@ -431,18 +454,18 @@
         let fillColor, fillOpacity, borderColor, borderWeight, dashArray;
 
         if (isFraccion) {
-          // Las 61 Fracciones o Territorios principales: color distintivo visible
+          // Las 61 Fracciones o Territorios principales: color de fondo visible del sector
           fillColor = fraccionColor;
-          fillOpacity = isSelected ? 0.75 : 0.52;
+          fillOpacity = isSelected ? 0.65 : 0.38;
           borderColor = isSelected ? '#38bdf8' : '#0f172a';
           borderWeight = isSelected ? 3.5 : 2;
           dashArray = null;
         } else {
-          // Manzanas individuales interiores: división sutil sin saturar
+          // Manzanas individuales interiores
           dashArray = null;
           if (manzana.estado === 'completada') {
             fillColor = estadoInfo.fill; // Verde esmeralda #10b981
-            fillOpacity = isSelected ? 0.88 : 0.70;
+            fillOpacity = isSelected ? 0.90 : 0.75;
             borderColor = isSelected ? '#38bdf8' : estadoInfo.border;
             borderWeight = isSelected ? 3 : 1.5;
           } else if (manzana.estado === 'alerta') {
@@ -451,16 +474,16 @@
             borderColor = isSelected ? '#38bdf8' : estadoInfo.border;
             borderWeight = isSelected ? 3 : 2;
           } else if (manzana.estado === 'en_reparto') {
-            fillColor = fraccionColor;
-            fillOpacity = isSelected ? 0.85 : 0.65;
-            borderColor = isSelected ? '#38bdf8' : '#1e40af';
+            fillColor = estadoInfo.fill; // Azul en reparto #3b82f6
+            fillOpacity = isSelected ? 0.90 : 0.75;
+            borderColor = isSelected ? '#38bdf8' : estadoInfo.border;
             borderWeight = isSelected ? 3 : 1.5;
           } else {
-            // pendiente: tono de su fracción pero semi-transparente para ver calles
+            // pendiente: tono suave de la fracción con borde blanco nítido para delimitar calles
             fillColor = fraccionColor;
-            fillOpacity = isSelected ? 0.65 : 0.25;
-            borderColor = isSelected ? '#38bdf8' : 'rgba(0,0,0,0.30)';
-            borderWeight = isSelected ? 2.5 : 1;
+            fillOpacity = isSelected ? 0.65 : 0.22;
+            borderColor = isSelected ? '#38bdf8' : 'rgba(255,255,255,0.75)';
+            borderWeight = isSelected ? 2.5 : 1.2;
           }
         }
 
@@ -472,7 +495,10 @@
               fillOpacity: fillOpacity,
               weight: borderWeight,
               dashArray: dashArray
-            }
+            },
+            // IMPORTANTE: la fracción es fondo (no interactiva) para que el clic pase
+            // directamente a las manzanas individuales que contiene
+            interactive: !isFraccion
           });
 
           // Solo colocar el número interior en el centro de cada Fracción (del 1 al 61)
@@ -501,25 +527,33 @@
             }
           }
 
-          // Tooltip descriptivo al pasar el cursor o pulsar
-          geoLayer.bindTooltip(`
-            <div style="font-size:12px; line-height:1.4;">
-              <strong style="color:#38bdf8; font-size:13px;">${rawName}</strong><br/>
-              <span style="color:#cbd5e1;">${isFraccion ? 'Límite Territorial' : 'Fracción ' + (fraccionNum || 'Rojas')}</span><br/>
-              <span style="color:#94a3b8;">Estado:</span> <strong style="color:${fillColor};">${estadoInfo.label}</strong><br/>
-              <span>📦 Paquetes: ${manzana.paquetes_entregados}/${manzana.total_paquetes}</span>
-            </div>
-          `, { className: 'manzana-tooltip', sticky: true, opacity: 0.95 });
+          const rawName = manzana.nombre_manzana || manzana.numero_manzana || (isFraccion ? `Fracción ${fraccionNum || ''}` : `Manzana ${manzana.id}`);
 
-          geoLayer.on('click', () => {
-            selectManzana(manzana.id);
-          });
+          if (!isFraccion) {
+            // Tooltip descriptivo en la manzana individual al pasar el cursor o pulsar
+            geoLayer.bindTooltip(`
+              <div style="font-size:12px; line-height:1.4;">
+                <strong style="color:#38bdf8; font-size:13px;">${rawName}</strong><br/>
+                <span style="color:#cbd5e1;">Fracción ${fraccionNum || 'Rojas'}</span><br/>
+                <span style="color:#94a3b8;">Estado:</span> <strong style="color:${fillColor};">${estadoInfo.label}</strong><br/>
+                <span>📦 Paquetes: ${manzana.paquetes_entregados}/${manzana.total_paquetes}</span>
+              </div>
+            `, { className: 'manzana-tooltip', sticky: true, opacity: 0.95 });
+
+            // Permitir seleccionar y marcar la manzana haciendo clic directo en el mapa
+            geoLayer.on('click', (e) => {
+              if (e && e.originalEvent && L.DomEvent) {
+                L.DomEvent.stopPropagation(e);
+              }
+              selectManzana(manzana.id);
+            });
+          }
 
           state.manzanasFeatureGroup.addLayer(geoLayer);
           state.geoJsonLayersMap.set(manzana.id, geoLayer);
           validLayersCount++;
         } catch (err) {
-          console.warn('Aviso: no se pudo dibujar poligono de manzana:', manzana.id);
+          console.warn('Aviso: no se pudo dibujar poligono de manzana:', manzana.id, err);
         }
       });
 
@@ -800,7 +834,7 @@
     if (!container) return;
     container.innerHTML = '';
 
-    const listaConductores = state.conductores || [];
+    const listaConductores = (state.conductores && state.conductores.length >= 18) ? state.conductores : CONDUCTORES_DEFAULT;
     listaConductores.forEach(conductor => {
       if (!conductor) return;
 
@@ -873,31 +907,31 @@
       selectConductor.innerHTML = '<option value="">-- Sin asignar --</option>';
       selectConductor.disabled = false;  // Asegurar que no este bloqueado
 
-      // Lista oficial de conductores reales de Rojas (fallback garantizado)
+      // Lista oficial de conductores reales de Rojas
       const CONDUCTORES_FALLBACK = [
         { cod: 'C-01', nombre: 'Antonini, Gustavo' },
         { cod: 'C-02', nombre: 'Aranda, Luis Alejandro' },
-        { cod: 'C-03', nombre: 'Blazquez, Daniel Omar' },
+        { cod: 'C-03', nombre: 'Blázquez, Daniel Omar' },
         { cod: 'C-04', nombre: 'Casanova, Roberto Daniel' },
-        { cod: 'C-05', nombre: 'Castro, Esteban Roman' },
-        { cod: 'C-06', nombre: 'Enrique, Andres' },
-        { cod: 'C-07', nombre: 'Fontanet, Hernan Dario' },
+        { cod: 'C-05', nombre: 'Castro, Esteban Román' },
+        { cod: 'C-06', nombre: 'Enrique, Andrés' },
+        { cod: 'C-07', nombre: 'Fontanet, Hernán Darío' },
         { cod: 'C-08', nombre: 'Fontanet, Juan Pablo' },
-        { cod: 'C-09', nombre: 'Garcia, Ramon Galo' },
+        { cod: 'C-09', nombre: 'García, Ramón Galo' },
         { cod: 'C-10', nombre: 'Ghirardi, Mauricio Juan' },
-        { cod: 'C-11', nombre: 'Lomonico, Rodolfo V.' },
-        { cod: 'C-12', nombre: 'Montiel Dure, Lucio' },
+        { cod: 'C-11', nombre: 'Lomónico, Rodolfo V.' },
+        { cod: 'C-12', nombre: 'Montiel Duré, Lucio' },
         { cod: 'C-13', nombre: 'Ruiz, Matias' },
-        { cod: 'C-14', nombre: 'Suarez Cejas, Roman Ezequiel' },
+        { cod: 'C-14', nombre: 'Suárez Cejas, Román Ezequiel' },
         { cod: 'C-15', nombre: 'Vezzoni, Lucas Ezequiel' },
-        { cod: 'C-16', nombre: 'Vezzoni, Miguel Angel' },
-        { cod: 'C-17', nombre: 'Villaroel, Damian' },
+        { cod: 'C-16', nombre: 'Vezzoni, Miguel Ángel' },
+        { cod: 'C-17', nombre: 'Villaroel, Damián' },
         { cod: 'C-18', nombre: 'Vizcaino, Mario Antonio' }
       ];
 
-      // Usar conductores de Supabase si estan disponibles, sino usar el fallback
-      const listaConductores = (state.conductores && state.conductores.length > 0)
-        ? state.conductores
+      // Siempre garantizar la lista de los 18 conductores oficiales de Rojas
+      const listaConductores = (CONDUCTORES_DEFAULT && CONDUCTORES_DEFAULT.length >= 18)
+        ? CONDUCTORES_DEFAULT
         : CONDUCTORES_FALLBACK.map(h => ({
             id: h.cod,
             nombre: h.nombre,

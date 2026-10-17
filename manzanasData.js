@@ -4,33 +4,24 @@
  */
 
 const CONDUCTORES_DEFAULT = [
-  {
-    id: '11111111-1111-1111-1111-111111111111',
-    nombre: 'Carlos Mendoza',
-    vehiculo: 'Moto Honda GLH 150',
-    telefono: '+54 2475 41-2345',
-    color: '#38bdf8', // Celeste cian vibrante
-    activo: true,
-    posicion: [-34.1975, -60.7335]
-  },
-  {
-    id: '22222222-2222-2222-2222-222222222222',
-    nombre: 'Martín Silva',
-    vehiculo: 'Renault Kangoo Utilitario',
-    telefono: '+54 2475 49-8765',
-    color: '#34d399', // Esmeralda vibrante
-    activo: true,
-    posicion: [-34.1978, -60.7310]
-  },
-  {
-    id: '33333333-3333-3333-3333-333333333333',
-    nombre: 'Lucas Fernández',
-    vehiculo: 'Moto Wave 110',
-    telefono: '+54 2475 43-3221',
-    color: '#fbbf24', // Ámbar dorado
-    activo: true,
-    posicion: [-34.1995, -60.7338]
-  }
+  { id: 'C-01', cod: 'C-01', codigo_conductor: 'C-01', nombre: 'Antonini, Gustavo', vehiculo: 'Moto', color: '#38bdf8', activo: true },
+  { id: 'C-02', cod: 'C-02', codigo_conductor: 'C-02', nombre: 'Aranda, Luis Alejandro', vehiculo: 'Moto', color: '#34d399', activo: true },
+  { id: 'C-03', cod: 'C-03', codigo_conductor: 'C-03', nombre: 'Blázquez, Daniel Omar', vehiculo: 'Utilitario', color: '#fbbf24', activo: true },
+  { id: 'C-04', cod: 'C-04', codigo_conductor: 'C-04', nombre: 'Casanova, Roberto Daniel', vehiculo: 'Moto', color: '#f472b6', activo: true },
+  { id: 'C-05', cod: 'C-05', codigo_conductor: 'C-05', nombre: 'Castro, Esteban Román', vehiculo: 'Moto', color: '#a78bfa', activo: true },
+  { id: 'C-06', cod: 'C-06', codigo_conductor: 'C-06', nombre: 'Enrique, Andrés', vehiculo: 'Moto', color: '#fb923c', activo: true },
+  { id: 'C-07', cod: 'C-07', codigo_conductor: 'C-07', nombre: 'Fontanet, Hernán Darío', vehiculo: 'Utilitario', color: '#2dd4bf', activo: true },
+  { id: 'C-08', cod: 'C-08', codigo_conductor: 'C-08', nombre: 'Fontanet, Juan Pablo', vehiculo: 'Moto', color: '#f87171', activo: true },
+  { id: 'C-09', cod: 'C-09', codigo_conductor: 'C-09', nombre: 'García, Ramón Galo', vehiculo: 'Moto', color: '#c084fc', activo: true },
+  { id: 'C-10', cod: 'C-10', codigo_conductor: 'C-10', nombre: 'Ghirardi, Mauricio Juan', vehiculo: 'Utilitario', color: '#facc15', activo: true },
+  { id: 'C-11', cod: 'C-11', codigo_conductor: 'C-11', nombre: 'Lomónico, Rodolfo V.', vehiculo: 'Moto', color: '#60a5fa', activo: true },
+  { id: 'C-12', cod: 'C-12', codigo_conductor: 'C-12', nombre: 'Montiel Duré, Lucio', vehiculo: 'Moto', color: '#a3e635', activo: true },
+  { id: 'C-13', cod: 'C-13', codigo_conductor: 'C-13', nombre: 'Ruiz, Matias', vehiculo: 'Moto', color: '#e879f9', activo: true },
+  { id: 'C-14', cod: 'C-14', codigo_conductor: 'C-14', nombre: 'Suárez Cejas, Román Ezequiel', vehiculo: 'Utilitario', color: '#f97316', activo: true },
+  { id: 'C-15', cod: 'C-15', codigo_conductor: 'C-15', nombre: 'Vezzoni, Lucas Ezequiel', vehiculo: 'Moto', color: '#06b6d4', activo: true },
+  { id: 'C-16', cod: 'C-16', codigo_conductor: 'C-16', nombre: 'Vezzoni, Miguel Ángel', vehiculo: 'Moto', color: '#84cc16', activo: true },
+  { id: 'C-17', cod: 'C-17', codigo_conductor: 'C-17', nombre: 'Villaroel, Damián', vehiculo: 'Moto', color: '#ec4899', activo: true },
+  { id: 'C-18', cod: 'C-18', codigo_conductor: 'C-18', nombre: 'Vizcaino, Mario Antonio', vehiculo: 'Moto', color: '#6366f1', activo: true }
 ];
 
 const MANZANAS_DEFAULT = [
@@ -40,7 +31,7 @@ const MANZANAS_DEFAULT = [
     barrio: 'Centro',
     calles: 'Av. 25 de Mayo, Alem, Constitución, Iribarne',
     estado: 'en_reparto',
-    conductor_id: '11111111-1111-1111-1111-111111111111',
+    conductor_id: 'C-01',
     conductor: CONDUCTORES_DEFAULT[0],
     total_paquetes: 14,
     paquetes_entregados: 8,
@@ -58,7 +49,7 @@ const MANZANAS_DEFAULT = [
     barrio: 'Centro',
     calles: 'Alem, Pte. Perón, Av. 25 de Mayo, Gral. Paz',
     estado: 'completada',
-    conductor_id: '11111111-1111-1111-1111-111111111111',
+    conductor_id: 'C-01',
     conductor: CONDUCTORES_DEFAULT[0],
     total_paquetes: 8,
     paquetes_entregados: 8,
@@ -76,7 +67,7 @@ const MANZANAS_DEFAULT = [
     barrio: 'Centro',
     calles: 'Iribarne, Av. 25 de Mayo, Dorrego, Moreno',
     estado: 'en_reparto',
-    conductor_id: '22222222-2222-2222-2222-222222222222',
+    conductor_id: 'C-02',
     conductor: CONDUCTORES_DEFAULT[1],
     total_paquetes: 18,
     paquetes_entregados: 11,
@@ -94,7 +85,7 @@ const MANZANAS_DEFAULT = [
     barrio: 'Progreso',
     calles: 'Gral. Paz, Tormey, María Unzué de Alvear, Zapiola',
     estado: 'pendiente',
-    conductor_id: '33333333-3333-3333-3333-333333333333',
+    conductor_id: 'C-03',
     conductor: CONDUCTORES_DEFAULT[2],
     total_paquetes: 7,
     paquetes_entregados: 0,
@@ -130,7 +121,7 @@ const MANZANAS_DEFAULT = [
     barrio: 'Estación',
     calles: 'Mitre, Lavalle, Larrea, Castelli',
     estado: 'alerta',
-    conductor_id: '33333333-3333-3333-3333-333333333333',
+    conductor_id: 'C-03',
     conductor: CONDUCTORES_DEFAULT[2],
     total_paquetes: 6,
     paquetes_entregados: 2,
@@ -148,7 +139,7 @@ const MANZANAS_DEFAULT = [
     barrio: 'Progreso',
     calles: 'Dorrego, Alsina, Belgrano, San Martín',
     estado: 'pendiente',
-    conductor_id: '22222222-2222-2222-2222-222222222222',
+    conductor_id: 'C-02',
     conductor: CONDUCTORES_DEFAULT[1],
     total_paquetes: 9,
     paquetes_entregados: 1,
@@ -166,7 +157,7 @@ const MANZANAS_DEFAULT = [
     barrio: 'Las Margaritas',
     calles: 'Pueyrredón, Castelli, San Martín, Larrea',
     estado: 'completada',
-    conductor_id: '11111111-1111-1111-1111-111111111111',
+    conductor_id: 'C-01',
     conductor: CONDUCTORES_DEFAULT[0],
     total_paquetes: 11,
     paquetes_entregados: 11,
