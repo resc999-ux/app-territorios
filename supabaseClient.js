@@ -132,10 +132,31 @@ async function updateManzana(manzanaId, fields) {
     const client = getSupabase();
     if (!client) throw new Error('Cliente Supabase no disponible');
 
+    // Columnas reales existentes en la tabla 'manzanas' de Supabase
+    const ALLOWED_COLUMNS = new Set([
+      'estado',
+      'status',
+      'conductor_id',
+      'notas',
+      'paquetes_entregados',
+      'total_paquetes',
+      'paquetes',
+      'barrio',
+      'calles',
+      'updated_at'
+    ]);
+
     const updatePayload = {
-      ...fields,
       updated_at: new Date().toISOString()
     };
+
+    if (fields && typeof fields === 'object') {
+      for (const [key, val] of Object.entries(fields)) {
+        if (ALLOWED_COLUMNS.has(key)) {
+          updatePayload[key] = val;
+        }
+      }
+    }
 
     const { data, error } = await client
       .from('manzanas')

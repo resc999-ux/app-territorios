@@ -974,14 +974,19 @@
     else if (estadoNuevo === 'en_reparto') dbStatus = 'en_reparto';
     else if (estadoNuevo === 'alerta') dbStatus = 'alerta';
 
-    const updatedFields = {
+    // Campos exactos de la tabla 'manzanas' en Supabase (evita error de columna inexistente)
+    const dbPayload = {
       estado: estadoNuevo,
       status: dbStatus,
-      conductor_actual: conductorVal,
       conductor_id: conductorVal,
-      observaciones: notasVal,
       notas: notasVal,
       updated_at: new Date().toISOString()
+    };
+
+    const updatedFields = {
+      ...dbPayload,
+      conductor_actual: conductorVal,
+      observaciones: notasVal
     };
 
     const idx = state.manzanas.findIndex(m => m && String(m.id) === String(manzanaId));
@@ -991,8 +996,8 @@
 
     if (state.isUsingSupabase) {
       try {
-        await updateManzana(manzanaId, updatedFields);
-        showToast('Manzana guardada en Supabase', 'success');
+        await updateManzana(manzanaId, dbPayload);
+        showToast('✅ Manzana guardada en Supabase', 'success');
 
         // ── LOGICA DE CASCADA EN FRACCION ────────────────────────────────
         // Obtener la fraccion a la que pertenece esta manzana
