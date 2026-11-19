@@ -1053,63 +1053,95 @@
     renderAll(false);
   }
 
+  // ── Persistencia local para historial S-13 (para cuando la tabla remota no existe) ──
+  function saveLocalS13Record(fraccionId, blockIndex, field, value) {
+    try {
+      const saved = localStorage.getItem('rojas_s13_historial');
+      const data = saved ? JSON.parse(saved) : {};
+      const key = String(fraccionId);
+      if (!data[key]) {
+        data[key] = {
+          ultima_fecha_completo: '',
+          blocks: [
+            { asignado: '', fecha_asigno: '', fecha_completo: '' },
+            { asignado: '', fecha_asigno: '', fecha_completo: '' },
+            { asignado: '', fecha_asigno: '', fecha_completo: '' },
+            { asignado: '', fecha_asigno: '', fecha_completo: '' }
+          ]
+        };
+      }
+      if (field === 'ultima_fecha_completo') {
+        data[key].ultima_fecha_completo = value;
+      } else if (data[key].blocks && data[key].blocks[blockIndex]) {
+        data[key].blocks[blockIndex][field] = value;
+      }
+      localStorage.setItem('rojas_s13_historial', JSON.stringify(data));
+    } catch (e) {
+      console.warn('Error al guardar en localStorage S-13:', e);
+    }
+  }
+
   // ── Registrar INICIO de territorio en historial_s13 ─────────────────────────
   async function registrarInicioFraccion(fraccionId, conductorNombre) {
     try {
       const client = window.SupabaseService?.getSupabase?.();
-      if (!client) return;
-
       const ahora = new Date();
       const fechaStr = ahora.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' });
       const ano = String(ahora.getFullYear());
 
-      // Buscar si ya existe una fila para este territorio en el año actual
-      const { data: existente } = await client
-        .from('historial_s13')
-        .select('*')
-        .eq('numero_terr', String(fraccionId))
-        .eq('ano_servicio', ano)
-        .maybeSingle();
+      // Guardar localmente siempre
+      saveLocalS13Record(fraccionId, 0, 'asignado', conductorNombre);
+      saveLocalS13Record(fraccionId, 0, 'fecha_asigno', fechaStr);
 
-      if (!existente) {
-        // Pase 1
-        await client.from('historial_s13').insert({
-          numero_terr: String(fraccionId),
-          ano_servicio: ano,
-          ultima_fecha_completo: null,
-          asignado_1: conductorNombre,
-          fecha_asigno_1: fechaStr,
-          fecha_completo_1: ''
-        });
-        console.log(`[S-13] Inicio de Territorio ${fraccionId} registrado para ${conductorNombre} (Pase 1)`);
-        showToast(`📅 Inicio del Territorio ${fraccionId} registrado en S-13 (Pase 1)`, 'info');
-      } else {
-        // Encontrar siguiente pase disponible (1 al 4)
-        let updatePayload = null;
-        let paseNum = 1;
+      if (client) {
+        // Buscar si ya existe una fila para este territorio en el año actual
+        const { data: existente } = await client
+          .from('historial_s13')
+          .select('*')
+          .eq('numero_terr', String(fraccionId))
+          .eq('ano_servicio', ano)
+          .maybeSingle();
 
-        if (!existente.fecha_asigno_1) {
-          updatePayload = { asignado_1: conductorNombre, fecha_asigno_1: fechaStr, fecha_completo_1: '' };
-          paseNum = 1;
-        } else if (existente.fecha_completo_1 && !existente.fecha_asigno_2) {
-          updatePayload = { asignado_2: conductorNombre, fecha_asigno_2: fechaStr, fecha_completo_2: '' };
-          paseNum = 2;
-        } else if (existente.fecha_completo_2 && !existente.fecha_asigno_3) {
-          updatePayload = { asignado_3: conductorNombre, fecha_asigno_3: fechaStr, fecha_completo_3: '' };
-          paseNum = 3;
-        } else if (existente.fecha_completo_3 && !existente.fecha_asigno_4) {
-          updatePayload = { asignado_4: conductorNombre, fecha_asigno_4: fechaStr, fecha_completo_4: '' };
-          paseNum = 4;
-        }
+        if (!existente) {
+          // Pase 1
+          await client.from('historial_s13').insert({
+            numero_terr: String(fraccionId),
+            ano_servicio: ano,
+            ultima_fecha_completo: null,
+            asignado_1: conductorNombre,
+            fecha_asigno_1: fechaStr,
+            fecha_completo_1: ''
+          });
+          showToast(`📅 Inicio del Territorio ${fraccionId} registrado en S-13 (Pase 1)`, 'info');
+        } else {
+          // Encontrar siguiente pase disponible (1 al 4)
+          let updatePayload = null;
+          let paseNum = 1;
 
-        if (updatePayload) {
-          await client.from('historial_s13').update(updatePayload).eq('id', existente.id);
-          console.log(`[S-13] Inicio de Territorio ${fraccionId} registrado para ${conductorNombre} (Pase ${paseNum})`);
-          showToast(`📅 Inicio del Territorio ${fraccionId} registrado en S-13 (Pase ${paseNum})`, 'info');
+          if (!existente.fecha_asigno_1) {
+            updatePayload = { asignado_1: conductorNombre, fecha_asigno_1: fechaStr, fecha_completo_1: '' };
+            paseNum = 1;
+          } else if (existente.fecha_completo_1 && !existente.fecha_asigno_2) {
+            updatePayload = { asignado_2: conductorNombre, fecha_asigno_2: fechaStr, fecha_completo_2: '' };
+            paseNum = 2;
+          } else if (existente.fecha_completo_2 && !existente.fecha_asigno_3) {
+            updatePayload = { asignado_3: conductorNombre, fecha_asigno_3: fechaStr, fecha_completo_3: '' };
+            paseNum = 3;
+          } else if (existente.fecha_completo_3 && !existente.fecha_asigno_4) {
+            updatePayload = { asignado_4: conductorNombre, fecha_asigno_4: fechaStr, fecha_completo_4: '' };
+            paseNum = 4;
+          }
+
+          if (updatePayload) {
+            saveLocalS13Record(fraccionId, paseNum - 1, 'asignado', conductorNombre);
+            saveLocalS13Record(fraccionId, paseNum - 1, 'fecha_asigno', fechaStr);
+            await client.from('historial_s13').update(updatePayload).eq('id', existente.id);
+            showToast(`📅 Inicio del Territorio ${fraccionId} registrado en S-13 (Pase ${paseNum})`, 'info');
+          }
         }
       }
     } catch (err) {
-      console.warn('[S-13] Error al registrar inicio de territorio:', err);
+      console.warn('[S-13] Aviso al registrar inicio de territorio:', err);
     }
   }
 
@@ -1121,39 +1153,46 @@
       const fechaStr = ahora.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' });
       const ano = String(ahora.getFullYear());
 
-      if (client) {
-        // Buscar la fila del historial para actualizar la fecha de fin
-        const { data: existente } = await client
-          .from('historial_s13')
-          .select('*')
-          .eq('numero_terr', String(fraccionId))
-          .eq('ano_servicio', ano)
-          .maybeSingle();
+      // Guardar localmente siempre
+      saveLocalS13Record(fraccionId, 0, 'fecha_completo', fechaStr);
+      saveLocalS13Record(fraccionId, 0, 'ultima_fecha_completo', fechaStr);
 
-        // Determinar en qué bloque guardar la fecha de fin
-        if (existente) {
-          const updatePayload = { ultima_fecha_completo: fechaStr };
-          if (existente.asignado_1 && !existente.fecha_completo_1) {
-            updatePayload.fecha_completo_1 = fechaStr;
-          } else if (existente.asignado_2 && !existente.fecha_completo_2) {
-            updatePayload.fecha_completo_2 = fechaStr;
-          } else if (existente.asignado_3 && !existente.fecha_completo_3) {
-            updatePayload.fecha_completo_3 = fechaStr;
-          } else if (existente.asignado_4 && !existente.fecha_completo_4) {
-            updatePayload.fecha_completo_4 = fechaStr;
+      if (client) {
+        try {
+          // Buscar la fila del historial para actualizar la fecha de fin
+          const { data: existente } = await client
+            .from('historial_s13')
+            .select('*')
+            .eq('numero_terr', String(fraccionId))
+            .eq('ano_servicio', ano)
+            .maybeSingle();
+
+          if (existente) {
+            const updatePayload = { ultima_fecha_completo: fechaStr };
+            if (existente.asignado_1 && !existente.fecha_completo_1) {
+              updatePayload.fecha_completo_1 = fechaStr;
+            } else if (existente.asignado_2 && !existente.fecha_completo_2) {
+              updatePayload.fecha_completo_2 = fechaStr;
+            } else if (existente.asignado_3 && !existente.fecha_completo_3) {
+              updatePayload.fecha_completo_3 = fechaStr;
+            } else if (existente.asignado_4 && !existente.fecha_completo_4) {
+              updatePayload.fecha_completo_4 = fechaStr;
+            } else {
+              updatePayload.fecha_completo_1 = fechaStr;
+            }
+            await client.from('historial_s13').update(updatePayload).eq('id', existente.id);
           } else {
-            updatePayload.fecha_completo_1 = fechaStr;
+            await client.from('historial_s13').insert({
+              numero_terr: String(fraccionId),
+              ano_servicio: ano,
+              ultima_fecha_completo: fechaStr,
+              asignado_1: conductorNombre,
+              fecha_asigno_1: fechaStr,
+              fecha_completo_1: fechaStr
+            });
           }
-          await client.from('historial_s13').update(updatePayload).eq('id', existente.id);
-        } else {
-          await client.from('historial_s13').insert({
-            numero_terr: String(fraccionId),
-            ano_servicio: ano,
-            ultima_fecha_completo: fechaStr,
-            asignado_1: conductorNombre,
-            fecha_asigno_1: fechaStr,
-            fecha_completo_1: fechaStr
-          });
+        } catch (errSupabase) {
+          console.warn('[S-13] Aviso con tabla historial_s13:', errSupabase);
         }
       }
 
@@ -1400,29 +1439,32 @@
   async function updateS13ModalPreview(rebuildPageOptions = false) {
     const year = document.getElementById('s13-input-year')?.value.trim() || '2026';
     const pageSelect = document.getElementById('s13-select-page');
-    const selectedPage = pageSelect ? parseInt(pageSelect.value, 10) : 0;
+    const selectedPage = pageSelect ? parseInt(pageSelect.value, 10) : -1;
 
     if (window.S13Report?.loadS13Preview) {
       const result = await window.S13Report.loadS13Preview(
         's13-preview-container',
         year,
-        isNaN(selectedPage) ? 0 : selectedPage
+        isNaN(selectedPage) ? -1 : selectedPage
       );
 
       // Si se solicita reconstruir las opciones de páginas
       if (rebuildPageOptions && result && result.totalPages > 0 && pageSelect) {
-        const currentVal = pageSelect.value;
-        pageSelect.innerHTML = '<option value="-1">Todas las hojas (Documento completo)</option>';
+        const currentVal = pageSelect.value || '-1';
+        pageSelect.innerHTML = '<option value="-1">Todas las hojas (Territorios 1 al 61)</option>';
         for (let p = 0; p < result.totalPages; p++) {
           const from = p * 24 + 1;
           const to = Math.min((p + 1) * 24, 61);
           const opt = document.createElement('option');
           opt.value = String(p);
           opt.textContent = `Página ${p + 1} (Territorios ${from} a ${to})`;
-          if (String(p) === currentVal || (p === 0 && currentVal === '0')) {
+          if (String(p) === currentVal) {
             opt.selected = true;
           }
           pageSelect.appendChild(opt);
+        }
+        if (currentVal === '-1' || !currentVal) {
+          pageSelect.value = '-1';
         }
       }
     }

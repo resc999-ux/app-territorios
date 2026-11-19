@@ -8,66 +8,180 @@
   const ROWS_PER_PAGE = 24; // Cantidad estándar exacta de territorios por hoja S-13
   const TOTAL_TERRITORIES = 61; // Total de territorios/fracciones de Rojas
 
+  // Mapeo oficial de códigos de conductores a nombres completos
+  const CONDUCTOR_MAP = {
+    'C-01': 'Antonini, Gustavo',
+    'C-02': 'Aranda, Luis Alejandro',
+    'C-03': 'Blázquez, Daniel Omar',
+    'C-04': 'Casanova, Roberto Daniel',
+    'C-05': 'Castro, Esteban Román',
+    'C-06': 'Enrique, Andrés',
+    'C-07': 'Fontanet, Hernán Darío',
+    'C-08': 'Fontanet, Juan Pablo',
+    'C-09': 'García, Ramón Galo',
+    'C-10': 'Ghirardi, Mauricio Juan',
+    'C-11': 'Lomónico, Rodolfo V.',
+    'C-12': 'Montiel Duré, Lucio',
+    'C-13': 'Ruiz, Matias',
+    'C-14': 'Suárez Cejas, Román Ezequiel',
+    'C-15': 'Vezzoni, Lucas Ezequiel',
+    'C-16': 'Vezzoni, Miguel Ángel',
+    'C-17': 'Villaroel, Damián',
+    'C-18': 'Vizcaino, Mario Antonio'
+  };
+
+  function extractTerritoryNum(m) {
+    if (!m) return null;
+    const props = m.coordenadas?.properties || {};
+    if (props.fraccion) return parseInt(props.fraccion, 10);
+    if (props.num_territorio) return parseInt(props.num_territorio, 10);
+    const name = String(m.nombre_manzana || m.numero_manzana || '').trim();
+    const match = name.match(/^(\d+)\s*[-–]/);
+    if (match) return parseInt(match[1], 10);
+    const matchFrac = name.match(/^(?:Frac|F)[^\d]*(\d+)/i);
+    if (matchFrac) return parseInt(matchFrac[1], 10);
+    return null;
+  }
+
+  function getConductorName(codeOrName, fallbackConductores) {
+    if (!codeOrName) return '';
+    const clean = String(codeOrName).trim();
+    if (CONDUCTOR_MAP[clean]) return CONDUCTOR_MAP[clean];
+    if (Array.isArray(fallbackConductores)) {
+      const found = fallbackConductores.find(c =>
+        c && (String(c.id) === clean || String(c.codigo_conductor) === clean || String(c.nombre) === clean)
+      );
+      if (found && found.nombre) return found.nombre;
+    }
+    return clean;
+  }
+
   /**
-   * Procesa las filas de historial_s13 y agrupa por territorio
+   * Procesa las filas de historial_s13, manzanas y localStorage para poblar los 61 territorios
    */
   function processHistorialData(rawData, fallbackManzanas, fallbackConductores) {
     const territoryMap = new Map();
 
-    // 1. Si vienen datos desde Supabase (historial_s13)
-    if (Array.isArray(rawData) && rawData.length > 0) {
-      rawData.forEach((row, idx) => {
-        const numTerr = String(row.numero_terr || row.numero_territorio || row.territorio || row.id || (idx + 1)).trim();
-        
-        // Formato ancho (columnas asignado_1, asignado_2...)
-        if (row.asignado_1 !== undefined || row.asignado_2 !== undefined) {
-          territoryMap.set(numTerr, {
-            numero_terr: numTerr,
-            ultima_fecha_completo: row.ultima_fecha_completo || row.ultima_fecha || '',
-            blocks: [
-              { asignado: row.asignado_1 || '', fecha_asigno: row.fecha_asigno_1 || '', fecha_completo: row.fecha_completo_1 || '' },
-              { asignado: row.asignado_2 || '', fecha_asigno: row.fecha_asigno_2 || '', fecha_completo: row.fecha_completo_2 || '' },
-              { asignado: row.asignado_3 || '', fecha_asigno: row.fecha_asigno_3 || '', fecha_completo: row.fecha_completo_3 || '' },
-              { asignado: row.asignado_4 || '', fecha_asigno: row.fecha_asigno_4 || '', fecha_completo: row.fecha_completo_4 || '' }
-            ]
-          });
-        } 
-        // Formato largo (una fila por asignación)
-        else {
-          if (!territoryMap.has(numTerr)) {
-            territoryMap.set(numTerr, {
-              numero_terr: numTerr,
-              ultima_fecha_completo: row.ultima_fecha_completo || row.ultima_fecha || '',
-              blocks: []
-            });
-          }
-          const item = territoryMap.get(numTerr);
-          if (item.blocks.length < 4) {
-            item.blocks.push({
-              asignado: row.asignado_a || row.asignado || row.conductor || '',
-              fecha_asigno: row.fecha_asigno || row.fecha_asignacion || '',
-              fecha_completo: row.fecha_completo || row.fecha_completado || ''
-            });
-          }
-        }
+    // 1. Inicializar siempre los 61 territorios con 4 bloques vacíos
+    for (let i = 1; i <= TOTAL_TERRITORIES; i++) {
+      const key = String(i);
+      territoryMap.set(key, {
+        numero_terr: key,
+        ultima_fecha_completo: '',
+        blocks: [
+          { asignado: '', fecha_asigno: '', fecha_completo: '' },
+          { asignado: '', fecha_asigno: '', fecha_completo: '' },
+          { asignado: '', fecha_asigno: '', fecha_completo: '' },
+          { asignado: '', fecha_asigno: '', fecha_completo: '' }
+        ]
       });
     }
 
-    // 2. Garantizar que todos los territorios del 1 al TOTAL_TERRITORIES (61) existan en el registro
-    for (let i = 1; i <= TOTAL_TERRITORIES; i++) {
-      const key = String(i);
-      if (!territoryMap.has(key)) {
-        territoryMap.set(key, {
-          numero_terr: key,
-          ultima_fecha_completo: '',
-          blocks: [
-            { asignado: '', fecha_asigno: '', fecha_completo: '' },
-            { asignado: '', fecha_asigno: '', fecha_completo: '' },
-            { asignado: '', fecha_asigno: '', fecha_completo: '' },
-            { asignado: '', fecha_asigno: '', fecha_completo: '' }
-          ]
-        });
+    // 2. Cargar historial guardado en localStorage (persistencia garantizada para todos los ciclos)
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const savedHistory = localStorage.getItem('rojas_s13_historial');
+        if (savedHistory) {
+          const parsed = JSON.parse(savedHistory);
+          if (typeof parsed === 'object') {
+            for (const [tKey, tData] of Object.entries(parsed)) {
+              if (territoryMap.has(String(tKey)) && tData) {
+                const item = territoryMap.get(String(tKey));
+                if (tData.ultima_fecha_completo) item.ultima_fecha_completo = tData.ultima_fecha_completo;
+                if (Array.isArray(tData.blocks)) {
+                  tData.blocks.forEach((b, bIdx) => {
+                    if (bIdx < 4 && b) {
+                      if (b.asignado) item.blocks[bIdx].asignado = b.asignado;
+                      if (b.fecha_asigno) item.blocks[bIdx].fecha_asigno = b.fecha_asigno;
+                      if (b.fecha_completo) item.blocks[bIdx].fecha_completo = b.fecha_completo;
+                    }
+                  });
+                }
+              }
+            }
+          }
+        }
       }
+    } catch (e) {
+      console.warn('Aviso al leer historial S-13 desde localStorage:', e);
+    }
+
+    // 3. Poblar datos reales a partir de las manzanas cargadas en el mapa (Supabase)
+    if (Array.isArray(fallbackManzanas) && fallbackManzanas.length > 0) {
+      for (let t = 1; t <= TOTAL_TERRITORIES; t++) {
+        const mList = fallbackManzanas.filter(m => {
+          if (!m) return false;
+          const num = extractTerritoryNum(m);
+          const isPerimetro = String(m.nombre_manzana || '').match(/^(?:Frac|F)[^\d]*\d+$/i);
+          return num === t && !m.es_fraccion && !isPerimetro;
+        });
+
+        if (mList.length > 0) {
+          const conductors = mList.map(m => m.conductor_id || m.conductor_actual).filter(Boolean);
+          const primaryCode = conductors[0] || '';
+          const conductorNombre = getConductorName(primaryCode, fallbackConductores);
+
+          // Buscar última fecha de actualización
+          let maxDate = null;
+          mList.forEach(m => {
+            if (m.updated_at) {
+              const d = new Date(m.updated_at);
+              if (!isNaN(d.getTime()) && (!maxDate || d > maxDate)) maxDate = d;
+            }
+          });
+          const fechaStr = maxDate
+            ? maxDate.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+            : '';
+
+          const allDone = mList.every(m => m.estado === 'completada' || m.status === 'Entregada');
+          const hasWork = conductors.length > 0 || mList.some(m => m.estado === 'completada' || m.estado === 'en_reparto');
+
+          const tItem = territoryMap.get(String(t));
+          if (tItem) {
+            if (allDone) {
+              if (!tItem.ultima_fecha_completo && fechaStr) tItem.ultima_fecha_completo = fechaStr;
+              if (!tItem.blocks[0].asignado && conductorNombre) {
+                tItem.blocks[0] = {
+                  asignado: conductorNombre,
+                  fecha_asigno: fechaStr,
+                  fecha_completo: fechaStr
+                };
+              }
+            } else if (hasWork) {
+              if (!tItem.blocks[0].asignado && conductorNombre) {
+                tItem.blocks[0] = {
+                  asignado: conductorNombre,
+                  fecha_asigno: fechaStr,
+                  fecha_completo: ''
+                };
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 4. Si vienen filas directas desde Supabase (tabla historial_s13 si existe)
+    if (Array.isArray(rawData) && rawData.length > 0) {
+      rawData.forEach((row, idx) => {
+        const numTerr = String(row.numero_terr || row.numero_territorio || row.territorio || row.id || (idx + 1)).trim();
+        if (territoryMap.has(numTerr)) {
+          const item = territoryMap.get(numTerr);
+          if (row.ultima_fecha_completo) item.ultima_fecha_completo = row.ultima_fecha_completo;
+          if (row.asignado_1) item.blocks[0].asignado = row.asignado_1;
+          if (row.fecha_asigno_1) item.blocks[0].fecha_asigno = row.fecha_asigno_1;
+          if (row.fecha_completo_1) item.blocks[0].fecha_completo = row.fecha_completo_1;
+          if (row.asignado_2) item.blocks[1].asignado = row.asignado_2;
+          if (row.fecha_asigno_2) item.blocks[1].fecha_asigno = row.fecha_asigno_2;
+          if (row.fecha_completo_2) item.blocks[1].fecha_completo = row.fecha_completo_2;
+          if (row.asignado_3) item.blocks[2].asignado = row.asignado_3;
+          if (row.fecha_asigno_3) item.blocks[2].fecha_asigno = row.fecha_asigno_3;
+          if (row.fecha_completo_3) item.blocks[2].fecha_completo = row.fecha_completo_3;
+          if (row.asignado_4) item.blocks[3].asignado = row.asignado_4;
+          if (row.fecha_asigno_4) item.blocks[3].fecha_asigno = row.fecha_asigno_4;
+          if (row.fecha_completo_4) item.blocks[3].fecha_completo = row.fecha_completo_4;
+        }
+      });
     }
 
     // Asegurar que cada territorio tenga exactamente 4 bloques
@@ -231,22 +345,23 @@
     const pages = processHistorialData(rawHistorial, fallbackManzanas, fallbackConductores);
     const pagesToExport = (pageIndex >= 0 && pageIndex < pages.length) ? [pages[pageIndex]] : pages;
 
-    // 3. Inyectar HTML y preparar contenedor en posición medible para html2canvas
+    // 3. Inyectar HTML y preparar contenedor en posición medible para html2canvas (capa superior visible para captura)
     container.style.display = 'block';
     container.style.position = 'fixed';
     container.style.top = '0';
     container.style.left = '0';
-    container.style.zIndex = '-9999';
+    container.style.zIndex = '999999';
     container.style.width = '210mm';
     container.style.height = 'auto';
     container.style.background = '#ffffff';
+    container.style.color = '#000000';
     container.style.opacity = '1';
     container.style.pointerEvents = 'none';
 
     container.innerHTML = buildS13PagesHTML(pagesToExport, serviceYear);
 
     // Esperar un ciclo para que el navegador dimensione el DOM y tablas antes del renderizado canvas
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 250));
 
     // 4. Configurar html2pdf para formato A4 vertical exacto
     const pageSuffix = (pageIndex >= 0) ? `_Pagina_${pageIndex + 1}` : '_Completo';
@@ -258,9 +373,9 @@
         scale: 2, // Alta definición para texto nítido
         useCORS: true,
         letterRendering: true,
+        backgroundColor: '#ffffff',
         scrollX: 0,
-        scrollY: 0,
-        windowWidth: 1024
+        scrollY: 0
       },
       jsPDF: {
         unit: 'mm',
@@ -270,16 +385,21 @@
       pagebreak: { mode: ['css', 'legacy'], after: '.s13-sheet' }
     };
 
-    try {
-      await html2pdf().set(opt).from(container).save();
-      console.log('✅ PDF de Formulario S-13 generado y descargado exitosamente');
-    } catch (err) {
-      console.error('Error al generar PDF S-13:', err);
-      alert('Ocurrió un error al generar el PDF: ' + err.message);
-    } finally {
-      container.style.display = 'none';
-      container.innerHTML = '';
-    }
+    return html2pdf()
+      .set(opt)
+      .from(container)
+      .save()
+      .then(() => {
+        container.style.display = 'none';
+        container.innerHTML = '';
+        console.log('✅ PDF de Formulario S-13 generado y descargado exitosamente');
+      })
+      .catch(err => {
+        container.style.display = 'none';
+        container.innerHTML = '';
+        console.error('Error al generar PDF S-13:', err);
+        alert('Ocurrió un error al generar el PDF: ' + err.message);
+      });
   }
 
   /**
