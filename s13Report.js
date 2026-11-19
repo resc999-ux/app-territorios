@@ -6,6 +6,7 @@
 
 (function () {
   const ROWS_PER_PAGE = 24; // Cantidad estándar exacta de territorios por hoja S-13
+  const TOTAL_TERRITORIES = 61; // Total de territorios/fracciones de Rojas
 
   /**
    * Procesa las filas de historial_s13 y agrupa por territorio
@@ -52,39 +53,12 @@
       });
     }
 
-    // 2. Si no hay datos en historial_s13, poblar a partir de las manzanas cargadas en el mapa
-    if (territoryMap.size === 0 && Array.isArray(fallbackManzanas) && fallbackManzanas.length > 0) {
-      // Tomar las primeras manzanas para llenar una plantilla completa
-      fallbackManzanas.slice(0, 48).forEach((m, idx) => {
-        // Extraer número limpio de territorio (ej: "M-101" -> "101", o "1", "2")
-        const cleanNum = String(m.numero_manzana || (idx + 1)).replace(/^M-?0*/i, '').split(' ')[0] || String(idx + 1);
-        const cond = fallbackConductores?.find(c => String(c.id) === String(m.conductor_id));
-        
-        const isCompletada = m.estado === 'completada';
-        const isEnReparto = m.estado === 'en_reparto';
-
-        territoryMap.set(cleanNum, {
-          numero_terr: cleanNum,
-          ultima_fecha_completo: isCompletada ? '28/02/26' : (idx % 2 === 0 ? '14/11/25' : ''),
-          blocks: [
-            {
-              asignado: cond ? cond.nombre : '',
-              fecha_asigno: isEnReparto || isCompletada ? '12/01/26' : '',
-              fecha_completo: isCompletada ? '28/02/26' : ''
-            },
-            { asignado: '', fecha_asigno: '', fecha_completo: '' },
-            { asignado: '', fecha_asigno: '', fecha_completo: '' },
-            { asignado: '', fecha_asigno: '', fecha_completo: '' }
-          ]
-        });
-      });
-    }
-
-    // 3. Si aún está vacío, generar plantilla base con números de territorio 1 a 24
-    if (territoryMap.size === 0) {
-      for (let i = 1; i <= ROWS_PER_PAGE; i++) {
-        territoryMap.set(String(i), {
-          numero_terr: String(i),
+    // 2. Garantizar que todos los territorios del 1 al TOTAL_TERRITORIES (61) existan en el registro
+    for (let i = 1; i <= TOTAL_TERRITORIES; i++) {
+      const key = String(i);
+      if (!territoryMap.has(key)) {
+        territoryMap.set(key, {
+          numero_terr: key,
           ultima_fecha_completo: '',
           blocks: [
             { asignado: '', fecha_asigno: '', fecha_completo: '' },
@@ -112,16 +86,15 @@
       return a.numero_terr.localeCompare(b.numero_terr);
     });
 
-    // Dividir en páginas de 24 territorios exactos
+    // Dividir en páginas de 24 territorios exactos (formato oficial de la hoja S-13)
     const pages = [];
     for (let i = 0; i < list.length; i += ROWS_PER_PAGE) {
       const pageItems = list.slice(i, i + ROWS_PER_PAGE);
       
-      // Si la última página tiene menos de 24 filas, rellenar con filas vacías
+      // Si la última página tiene menos de 24 filas, rellenar con filas vacías para mantener la altura A4 exacta
       while (pageItems.length < ROWS_PER_PAGE) {
-        const nextNum = pageItems.length + 1 + i;
         pageItems.push({
-          numero_terr: String(nextNum),
+          numero_terr: '',
           ultima_fecha_completo: '',
           blocks: [
             { asignado: '', fecha_asigno: '', fecha_completo: '' },
@@ -258,19 +231,36 @@
     const pages = processHistorialData(rawHistorial, fallbackManzanas, fallbackConductores);
     const pagesToExport = (pageIndex >= 0 && pageIndex < pages.length) ? [pages[pageIndex]] : pages;
 
-    // 3. Inyectar HTML en el contenedor de impresión
+    // 3. Inyectar HTML y preparar contenedor en posición medible para html2canvas
+    container.style.display = 'block';
+    container.style.position = 'fixed';
+    container.style.top = '0';
+    container.style.left = '0';
+    container.style.zIndex = '-9999';
+    container.style.width = '210mm';
+    container.style.height = 'auto';
+    container.style.background = '#ffffff';
+    container.style.opacity = '1';
+    container.style.pointerEvents = 'none';
+
     container.innerHTML = buildS13PagesHTML(pagesToExport, serviceYear);
 
+    // Esperar un ciclo para que el navegador dimensione el DOM y tablas antes del renderizado canvas
+    await new Promise(resolve => setTimeout(resolve, 200));
+
     // 4. Configurar html2pdf para formato A4 vertical exacto
+    const pageSuffix = (pageIndex >= 0) ? `_Pagina_${pageIndex + 1}` : '_Completo';
     const opt = {
       margin: 0,
-      filename: `S-13_Registro_Asignacion_Territorio_${serviceYear}.pdf`,
+      filename: `S-13_Registro_Asignacion_Territorio_${serviceYear}${pageSuffix}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: {
         scale: 2, // Alta definición para texto nítido
         useCORS: true,
         letterRendering: true,
-        scrollY: 0
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: 1024
       },
       jsPDF: {
         unit: 'mm',
@@ -280,17 +270,16 @@
       pagebreak: { mode: ['css', 'legacy'], after: '.s13-sheet' }
     };
 
-    return html2pdf()
-      .set(opt)
-      .from(container)
-      .save()
-      .then(() => {
-        console.log('✅ PDF de Formulario S-13 generado y descargado exitosamente');
-      })
-      .catch(err => {
-        console.error('Error al generar PDF S-13:', err);
-        alert('Ocurrió un error al generar el PDF: ' + err.message);
-      });
+    try {
+      await html2pdf().set(opt).from(container).save();
+      console.log('✅ PDF de Formulario S-13 generado y descargado exitosamente');
+    } catch (err) {
+      console.error('Error al generar PDF S-13:', err);
+      alert('Ocurrió un error al generar el PDF: ' + err.message);
+    } finally {
+      container.style.display = 'none';
+      container.innerHTML = '';
+    }
   }
 
   /**

@@ -999,8 +999,8 @@
         await updateManzana(manzanaId, dbPayload);
         showToast('✅ Manzana guardada en Supabase', 'success');
 
-        // ── LOGICA DE CASCADA EN FRACCION ────────────────────────────────
-        // Obtener la fraccion a la que pertenece esta manzana
+        // ── LOGICA DE CASCADA EN TERRITORIO / FRACCION ───────────────────
+        // Obtener la fraccion/territorio a la que pertenece esta manzana
         const manzanaActualizada = state.manzanas[idx];
         const fraccionId = getFraccionNumero(manzanaActualizada);
 
@@ -1015,27 +1015,28 @@
             return c ? c.nombre : (conductorVal || 'Sin asignar');
           })();
 
-          // Manzanas de la misma fraccion
-          const manzanasFraccion = state.manzanas.filter(m => m && getFraccionNumero(m) === fraccionId);
+          // Manzanas individuales de este territorio (excluyendo el perímetro general)
+          const manzanasTerritorio = state.manzanas.filter(m =>
+            m && !m.es_fraccion && !esFraccionBoundary(m) && getFraccionNumero(m) === fraccionId
+          );
 
-          // FECHA DE INICIO: si pasa a 'en_reparto' y es la PRIMERA de la fraccion
+          // FECHA DE INICIO: si pasa a 'en_reparto' y es la PRIMERA manzana del territorio
           if (estadoNuevo === 'en_reparto') {
-            const yaHabiaEnReparto = manzanasFraccion.some(m =>
-              m.id !== manzanaId && (m.estado === 'en_reparto' || m.estado === 'completada')
+            const yaHabiaEnReparto = manzanasTerritorio.some(m =>
+              String(m.id) !== String(manzanaId) && (m.estado === 'en_reparto' || m.estado === 'completada')
             );
             if (!yaHabiaEnReparto) {
-              // Es la primera manzana abierta de la fraccion -> registrar inicio
               await registrarInicioFraccion(fraccionId, conductorNombre);
             }
           }
 
-          // FECHA DE FIN: si pasa a 'completada', verificar si TODAS completadas
+          // FECHA DE FIN: si pasa a 'completada', verificar si TODAS las manzanas se completaron
           if (estadoNuevo === 'completada') {
-            const todasCompletas = manzanasFraccion.every(m =>
-              m.id === manzanaId ? true : (m.estado === 'completada')
+            const todasCompletas = manzanasTerritorio.length > 0 && manzanasTerritorio.every(m =>
+              String(m.id) === String(manzanaId) ? true : (m.estado === 'completada')
             );
-            if (todasCompletas && manzanasFraccion.length > 0) {
-              await cerrarFraccion(fraccionId, conductorNombre);
+            if (todasCompletas) {
+              await cerrarFraccion(fraccionId, conductorNombre, manzanasTerritorio);
             }
           }
         }
@@ -1052,7 +1053,7 @@
     renderAll(false);
   }
 
-  // ── Registrar INICIO de fraccion en historial_s13 ─────────────────────────
+  // ── Registrar INICIO de territorio en historial_s13 ─────────────────────────
   async function registrarInicioFraccion(fraccionId, conductorNombre) {
     try {
       const client = window.SupabaseService?.getSupabase?.();
@@ -1060,90 +1061,139 @@
 
       const ahora = new Date();
       const fechaStr = ahora.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' });
-      const ano = ahora.getFullYear();
+      const ano = String(ahora.getFullYear());
 
-      // Buscar si ya existe una fila para este territorio en el ano actual
+      // Buscar si ya existe una fila para este territorio en el año actual
       const { data: existente } = await client
         .from('historial_s13')
         .select('*')
         .eq('numero_terr', String(fraccionId))
-        .eq('ano_servicio', String(ano))
+        .eq('ano_servicio', ano)
         .maybeSingle();
 
       if (!existente) {
-        // Crear nueva fila con el conductor y la fecha de inicio
+        // Pase 1
         await client.from('historial_s13').insert({
           numero_terr: String(fraccionId),
-          ano_servicio: String(ano),
+          ano_servicio: ano,
           ultima_fecha_completo: null,
           asignado_1: conductorNombre,
           fecha_asigno_1: fechaStr,
           fecha_completo_1: ''
         });
-        console.log(`[S-13] Inicio de Fraccion ${fraccionId} registrado para ${conductorNombre}`);
-        showToast(`📅 Inicio del Territorio ${fraccionId} registrado automaticamente`, 'info');
+        console.log(`[S-13] Inicio de Territorio ${fraccionId} registrado para ${conductorNombre} (Pase 1)`);
+        showToast(`📅 Inicio del Territorio ${fraccionId} registrado en S-13 (Pase 1)`, 'info');
+      } else {
+        // Encontrar siguiente pase disponible (1 al 4)
+        let updatePayload = null;
+        let paseNum = 1;
+
+        if (!existente.fecha_asigno_1) {
+          updatePayload = { asignado_1: conductorNombre, fecha_asigno_1: fechaStr, fecha_completo_1: '' };
+          paseNum = 1;
+        } else if (existente.fecha_completo_1 && !existente.fecha_asigno_2) {
+          updatePayload = { asignado_2: conductorNombre, fecha_asigno_2: fechaStr, fecha_completo_2: '' };
+          paseNum = 2;
+        } else if (existente.fecha_completo_2 && !existente.fecha_asigno_3) {
+          updatePayload = { asignado_3: conductorNombre, fecha_asigno_3: fechaStr, fecha_completo_3: '' };
+          paseNum = 3;
+        } else if (existente.fecha_completo_3 && !existente.fecha_asigno_4) {
+          updatePayload = { asignado_4: conductorNombre, fecha_asigno_4: fechaStr, fecha_completo_4: '' };
+          paseNum = 4;
+        }
+
+        if (updatePayload) {
+          await client.from('historial_s13').update(updatePayload).eq('id', existente.id);
+          console.log(`[S-13] Inicio de Territorio ${fraccionId} registrado para ${conductorNombre} (Pase ${paseNum})`);
+          showToast(`📅 Inicio del Territorio ${fraccionId} registrado en S-13 (Pase ${paseNum})`, 'info');
+        }
       }
     } catch (err) {
-      console.warn('[S-13] Error al registrar inicio de fraccion:', err);
+      console.warn('[S-13] Error al registrar inicio de territorio:', err);
     }
   }
 
-  // ── Cerrar FRACCION completa: guardar fecha fin y resetear manzanas ─────────
-  async function cerrarFraccion(fraccionId, conductorNombre) {
+  // ── Cerrar TERRITORIO completo: guardar fecha fin y resetear manzanas ─────────
+  async function cerrarFraccion(fraccionId, conductorNombre, manzanasTerritorio) {
     try {
       const client = window.SupabaseService?.getSupabase?.();
-      if (!client) return;
-
       const ahora = new Date();
       const fechaStr = ahora.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' });
-      const ano = ahora.getFullYear();
+      const ano = String(ahora.getFullYear());
 
-      // Buscar la fila del historial para actualizar la fecha de fin
-      const { data: existente } = await client
-        .from('historial_s13')
-        .select('*')
-        .eq('numero_terr', String(fraccionId))
-        .eq('ano_servicio', String(ano))
-        .maybeSingle();
+      if (client) {
+        // Buscar la fila del historial para actualizar la fecha de fin
+        const { data: existente } = await client
+          .from('historial_s13')
+          .select('*')
+          .eq('numero_terr', String(fraccionId))
+          .eq('ano_servicio', ano)
+          .maybeSingle();
 
-      // Determinar en que bloque guardar la fecha de fin
-      if (existente) {
-        const updatePayload = { ultima_fecha_completo: fechaStr };
-        // Completar el bloque que corresponda segun cual tiene fecha_asigno pero no fecha_completo
-        if (existente.asignado_1 && !existente.fecha_completo_1) {
-          updatePayload.fecha_completo_1 = fechaStr;
-        } else if (existente.asignado_2 && !existente.fecha_completo_2) {
-          updatePayload.fecha_completo_2 = fechaStr;
-        } else if (existente.asignado_3 && !existente.fecha_completo_3) {
-          updatePayload.fecha_completo_3 = fechaStr;
-        } else if (existente.asignado_4 && !existente.fecha_completo_4) {
-          updatePayload.fecha_completo_4 = fechaStr;
+        // Determinar en qué bloque guardar la fecha de fin
+        if (existente) {
+          const updatePayload = { ultima_fecha_completo: fechaStr };
+          if (existente.asignado_1 && !existente.fecha_completo_1) {
+            updatePayload.fecha_completo_1 = fechaStr;
+          } else if (existente.asignado_2 && !existente.fecha_completo_2) {
+            updatePayload.fecha_completo_2 = fechaStr;
+          } else if (existente.asignado_3 && !existente.fecha_completo_3) {
+            updatePayload.fecha_completo_3 = fechaStr;
+          } else if (existente.asignado_4 && !existente.fecha_completo_4) {
+            updatePayload.fecha_completo_4 = fechaStr;
+          } else {
+            updatePayload.fecha_completo_1 = fechaStr;
+          }
+          await client.from('historial_s13').update(updatePayload).eq('id', existente.id);
+        } else {
+          await client.from('historial_s13').insert({
+            numero_terr: String(fraccionId),
+            ano_servicio: ano,
+            ultima_fecha_completo: fechaStr,
+            asignado_1: conductorNombre,
+            fecha_asigno_1: fechaStr,
+            fecha_completo_1: fechaStr
+          });
         }
-        await client.from('historial_s13').update(updatePayload).eq('id', existente.id);
-      } else {
-        // Crear registro completo si no existia
-        await client.from('historial_s13').insert({
-          numero_terr: String(fraccionId),
-          ano_servicio: String(ano),
-          ultima_fecha_completo: fechaStr,
-          asignado_1: conductorNombre,
-          fecha_asigno_1: fechaStr,
-          fecha_completo_1: fechaStr
-        });
       }
 
-      console.log(`[S-13] Fraccion ${fraccionId} COMPLETADA. Fecha fin: ${fechaStr}`);
+      console.log(`[S-13] Territorio ${fraccionId} COMPLETADO. Fecha fin: ${fechaStr}`);
 
-      // Mostrar alerta de exito
-      showToast(`🎉 Territorio ${fraccionId} COMPLETADO. Datos archivados en S-13.`, 'success');
-      setTimeout(() => {
-        if (confirm(`¡TERRITORIO ${fraccionId} COMPLETADO!\n\nTodas las manzanas de esta fraccion fueron terminadas.\nLos datos han sido archivados en el Registro S-13.\n\n¿Deseas recargar el mapa para ver el territorio reiniciado?`)) {
-          location.reload();
+      // ── RESETEAR MANZANAS DEL TERRITORIO: DESPINTAR Y LIBERAR PARA NUEVO CICLO ──
+      const resetPayload = {
+        estado: 'pendiente',
+        status: 'Pending',
+        conductor_id: null,
+        notas: '',
+        updated_at: new Date().toISOString()
+      };
+
+      if (Array.isArray(manzanasTerritorio)) {
+        for (const m of manzanasTerritorio) {
+          m.estado = 'pendiente';
+          m.status = 'Pending';
+          m.conductor_id = null;
+          m.conductor_actual = null;
+          m.notas = '';
+          m.observaciones = '';
+
+          if (state.isUsingSupabase && client) {
+            try {
+              await updateManzana(m.id, resetPayload);
+            } catch (errM) {
+              console.warn(`Aviso al resetear manzana ${m.id}:`, errM);
+            }
+          }
         }
-      }, 800);
+      }
+
+      // Re-renderizar mapa inmediatamente para que las manzanas vuelvan a su color original (libres)
+      renderAll(false);
+
+      showToast(`🎉 ¡Territorio ${fraccionId} COMPLETADO! Fecha archivada en S-13 y manzanas liberadas para nuevo ciclo.`, 'success');
 
     } catch (err) {
-      console.warn('[S-13] Error al cerrar fraccion:', err);
+      console.warn('[S-13] Error al cerrar territorio:', err);
     }
   }
 
@@ -1301,12 +1351,27 @@
     document.getElementById('btn-print-s13')?.addEventListener('click', async () => {
       const year = document.getElementById('s13-input-year')?.value.trim() || '2026';
       const pageIdx = parseInt(document.getElementById('s13-select-page')?.value, 10);
-
-      // Asegurar que el contenedor de impresión tenga el contenido
       const target = document.getElementById('s13-print-render-target');
+
       if (target && window.S13Report) {
-        showToast('Preparando vista de impresión...', 'info');
-        await window.S13Report.downloadS13PDF({ serviceYear: year, pageIndex: isNaN(pageIdx) ? -1 : pageIdx });
+        let rawHistorial = [];
+        try {
+          if (window.SupabaseService?.fetchHistorialS13) {
+            rawHistorial = await window.SupabaseService.fetchHistorialS13();
+          }
+        } catch (e) { }
+
+        const fallbackManzanas = window.AppState?.manzanas || [];
+        const fallbackConductores = window.AppState?.conductores || [];
+        const pages = window.S13Report.processHistorialData(rawHistorial, fallbackManzanas, fallbackConductores);
+        const pagesToExport = (pageIdx >= 0 && pageIdx < pages.length) ? [pages[pageIdx]] : pages;
+
+        target.innerHTML = window.S13Report.buildS13PagesHTML(pagesToExport, year);
+        target.style.display = 'block';
+        window.print();
+        setTimeout(() => {
+          target.style.display = 'none';
+        }, 1000);
       } else {
         window.print();
       }
@@ -1350,7 +1415,7 @@
         pageSelect.innerHTML = '<option value="-1">Todas las hojas (Documento completo)</option>';
         for (let p = 0; p < result.totalPages; p++) {
           const from = p * 24 + 1;
-          const to = (p + 1) * 24;
+          const to = Math.min((p + 1) * 24, 61);
           const opt = document.createElement('option');
           opt.value = String(p);
           opt.textContent = `Página ${p + 1} (Territorios ${from} a ${to})`;

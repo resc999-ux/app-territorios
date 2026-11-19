@@ -831,14 +831,18 @@ body {
    "REGISTRO DE ASIGNACIÓN DE TERRITORIO" (S-13-S 1/22)
    ======================================================== */
 
-/* Contenedor oculto para renderizado de html2pdf */
+/* Contenedor para renderizado de html2pdf e impresión */
 #s13-print-render-target {
-  position: absolute;
-  left: -99999px;
-  top: -99999px;
+  display: none;
   width: 210mm;
   background: #ffffff;
   color: #000000;
+}
+
+#s13-print-render-target .s13-sheet {
+  margin: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
 }
 
 /* Hoja A4 estricta */
